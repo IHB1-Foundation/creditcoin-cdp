@@ -119,6 +119,7 @@ Troubleshooting:
   - Use legacy tx (default): `USE_LEGACY_TX=true bash scripts/deploy_and_bind.sh`
   - Pin gas price if needed: `GAS_PRICE_GWEI=2 bash scripts/deploy_and_bind.sh`
   - Skip simulation (default): `SKIP_SIMULATION=true bash scripts/deploy_and_bind.sh`
+- If the preflight RPC check fails, the script now auto-tries: `$RPC_URL`, `$RPC_URL/evm`, `$RPC_URL/eth`, `$RPC_URL/rpc`. You can bypass with `SKIP_PREFLIGHT=true`, but verify your RPC actually serves `eth_*` endpoints.
 
 ### Local Deployment (Anvil)
 
