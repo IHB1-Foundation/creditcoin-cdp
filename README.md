@@ -21,7 +21,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 - **Stablecoin (crdUSD)**: Protocol-controlled stablecoin
 - **VaultManager**: Core CDP logic for managing collateralized positions
   - Borrowers choose a per-vault interest rate (0–10%)
-  - Redemptions execute from lowest-interest vaults first
+  - Redemptions execute from lowest-APR vaults first (prefers larger loans on ties)
 - **StabilityPool**: Liquidation buffer that absorbs bad debt
 - **LiquidationEngine**: Handles liquidation of unhealthy vaults
 - **PushOracle**: Owner-updated oracle with staleness checks (replace with Chainlink/API3 in production)
@@ -230,7 +230,7 @@ uint256 wctcReceivedAdvanced = vaultManager.redeemAdvanced(5_000e18, msg.sender,
 
 ### Advanced Redemption (APR Cap + Tie Preference)
 
-- Targeting: Redemptions prioritize the lowest-interest vaults first. Among equal APR vaults, the contract defaults to preferring larger debts first. You can override this behavior via `redeemAdvanced`.
+- Targeting: Redemptions prioritize the lowest-APR vaults first. Among equal APR vaults, the contract defaults to preferring larger debts first. You can override this behavior via `redeemAdvanced`.
 - APR Cap: Use `redeemWithCap` or `redeemAdvanced` to skip vaults above a maximum APR (WAD). Example: 3% APR cap = `0.03e18`.
 - Tie Preference: With `redeemAdvanced`, set `preferLargerDebt=true` to redeem from larger debts first (default), or `false` for smaller debts first.
 

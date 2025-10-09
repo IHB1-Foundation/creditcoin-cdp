@@ -9,7 +9,7 @@ The redemption mechanism allows crdUSD holders to burn their stablecoins in exch
 ### Basic Flow
 
 1. **User burns crdUSD**: The redeemer burns crdUSD stablecoins from their balance
-2. **Vault targeting**: Protocol identifies vaults with the lowest collateral ratio (CR)
+2. **Vault targeting**: Protocol identifies vaults with the lowest APR (interest rate)
 3. **Collateral extraction**: Proportional wCTC collateral is removed from targeted vaults
 4. **Fee application**: A redemption fee (default 0.5%) is applied on the collateral
 5. **Transfer**: Net collateral (after fee) is sent to the receiver; fee goes to treasury

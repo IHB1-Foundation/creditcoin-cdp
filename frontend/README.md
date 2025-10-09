@@ -7,8 +7,7 @@ A modern, minimal, and fully functional frontend for the Credit CDP Protocol bui
 - ✅ **Vault Management**: Open, adjust, and close collateralized vaults
 - ✅ **Stability Pool**: Deposit crdUSD and earn liquidation rewards
 - ✅ **Redemption**: Burn crdUSD to receive wCTC at oracle price
-  - Target lowest-interest vaults first
-  - Optional Max APR cap; tie-preference (larger/smaller debt first)
+  - Targets lowest-APR vaults first; prefers larger loans on ties
 - ✅ **Real-time Data**: Direct contract reads, no subgraph needed
 - ✅ **Wallet Integration**: MetaMask support via Wagmi
 - ✅ **Responsive Design**: Mobile-friendly TailwindCSS UI
@@ -189,10 +188,9 @@ Before opening a vault, you need wCTC collateral:
 1. Navigate to the Redemption card
 2. Enter crdUSD amount to redeem
 3. Review the estimated wCTC you'll receive
-4. Optionally set a Max APR cap (0–10%) and tie-preference
-5. Click "Redeem"
-6. Approve crdUSD if needed
-7. Confirm the transaction
+4. Click "Redeem"
+5. Approve crdUSD if needed
+6. Confirm the transaction
 
 ## Key Features Explained
 
@@ -211,9 +209,7 @@ Before opening a vault, you need wCTC collateral:
 ### Redemption
 
 - **Fee**: 0.5% default redemption fee on collateral received
-- **Targeting**: Redeems from vaults with lowest interest first (deterministic ties)
-- **APR Cap**: Skip vaults above your chosen Max APR
-- **Tie Preference**: For equal APR, prefer larger or smaller debts first
+- **Targeting**: Redeems from vaults with lowest APR first; prefers larger loans on ties
 - **Oracle Price**: Uses real-time oracle price for redemption rate
 
 ## Troubleshooting

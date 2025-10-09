@@ -25,7 +25,7 @@ function redeem(uint256 rUSDAmount, address receiver)
 
 **Features**:
 - Burns crdUSD from caller
-- Targets vaults with lowest collateral ratio first
+- Targets vaults with lowest APR (interest rate) first; prefers larger debts on ties by default
 - Skips liquidatable vaults (below MCR)
 - Applies configurable redemption fee (default 0.5%)
 - Auto-closes vaults when debt falls below MIN_DEBT

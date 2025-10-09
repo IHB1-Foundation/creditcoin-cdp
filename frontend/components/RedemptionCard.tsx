@@ -21,8 +21,7 @@ export function RedemptionCard() {
   const { price } = useOracle();
 
   const [amount, setAmount] = useState('');
-  const [maxApr, setMaxApr] = useState(''); // optional APR cap in %
-  const [preferLargerDebt, setPreferLargerDebt] = useState(true);
+  // Redemption policy is fixed: lowest APR first, prefer larger loans on ties
   const amountBigInt = amount ? parseToBigInt(amount) : undefined;
 
   const { estimatedCollateral, grossCollateral, feeAmount, redemptionFeeRate } = useRedemptionEstimate(amountBigInt);
@@ -69,18 +68,8 @@ export function RedemptionCard() {
         return;
       }
 
-      // Optional APR cap
-      let capWad: bigint | undefined = undefined;
-      if (maxApr) {
-        const capNum = Number(maxApr);
-        if (isNaN(capNum) || capNum < 0 || capNum > 10) {
-          toast.error('Max APR cap must be between 0% and 10%');
-          return;
-        }
-        capWad = parseToBigInt((capNum / 100).toString());
-      }
-
-      await redeem(redeemAmount, address, capWad, preferLargerDebt);
+      // Always redeem from lowest APR vaults; prefers larger loans on ties
+      await redeem(redeemAmount, address);
     } catch (error) {
       // Error handling in hook
     }
@@ -116,66 +105,7 @@ export function RedemptionCard() {
           }
         />
 
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700">Max APR to target (%)</label>
-            <span className="text-xs text-gray-500">Optional • 0 - 10</span>
-          </div>
-          {/* Quick-select presets */}
-          <div className="mb-2 flex gap-2">
-            {["1.0", "3.0", "5.0"].map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={`px-2 py-1 text-xs rounded border ${maxApr === p ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-700'}`}
-                onClick={() => setMaxApr(p)}
-              >
-                {p}%
-              </button>
-            ))}
-            <button
-              type="button"
-              className={`px-2 py-1 text-xs rounded border ${maxApr === '' ? 'bg-gray-50 border-gray-200 text-gray-700' : 'bg-white border-gray-200 text-gray-700'}`}
-              onClick={() => setMaxApr('')}
-            >
-              No cap
-            </button>
-          </div>
-          <Input
-            type="number"
-            placeholder="e.g., 3.0"
-            value={maxApr}
-            onChange={(e) => setMaxApr(e.target.value)}
-          />
-          <p className="mt-1 text-xs text-gray-500">Vaults above this APR are skipped.</p>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <label className="text-sm font-medium text-gray-700">Tie Preference</label>
-            <span className="text-xs text-gray-500">Among equal APR vaults</span>
-          </div>
-          <div className="flex items-center gap-3 text-sm">
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="tiePref"
-                checked={preferLargerDebt}
-                onChange={() => setPreferLargerDebt(true)}
-              />
-              Prefer larger debt first
-            </label>
-            <label className="inline-flex items-center gap-2">
-              <input
-                type="radio"
-                name="tiePref"
-                checked={!preferLargerDebt}
-                onChange={() => setPreferLargerDebt(false)}
-              />
-              Prefer smaller debt first
-            </label>
-          </div>
-        </div>
+        {/* Targeting policy is fixed; no APR cap or tie preference controls */}
 
         <div className="text-xs text-gray-500">
           Available: <span className="font-medium text-gray-700">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'}</span> crdUSD
@@ -213,7 +143,7 @@ export function RedemptionCard() {
             </div>
             {(minRate !== undefined) && (
               <div className="pt-2 text-xs text-gray-600">
-                Targets lowest-interest vaults first. Current lowest APR: <span className="font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
+                Targets lowest-APR vaults first (prefers larger loans on ties). Current lowest APR: <span className="font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
               </div>
             )}
           </div>
@@ -222,7 +152,7 @@ export function RedemptionCard() {
         {/* Redemption Target Policy */}
         <div className="rounded-xl p-3 bg-gray-50 border border-gray-100">
           <p className="text-xs text-gray-600">
-            Redemptions target vaults with the lowest interest first.
+            Redemptions target vaults with the lowest APR first (prefers larger loans on ties).
             {minRate !== undefined && maxRate !== undefined && (
               <>
                 {' '}Current range: <span className="font-medium">{minRate ? `${(Number(minRate) * 100 / 1e18).toFixed(2)}%` : '--'}</span>
@@ -251,7 +181,7 @@ export function RedemptionCard() {
       <div className="mt-6 p-4 bg-warning/10 border border-warning/20 rounded-xl">
         <p className="text-sm text-warning font-medium mb-2">⚠️ Important</p>
         <ul className="text-sm text-gray-700 space-y-1">
-          <li>• Redemptions target vaults with lowest collateral ratio</li>
+          <li>• Redemptions target vaults with lowest APR (prefers larger loans on ties)</li>
           <li>• Oracle price is used for redemption rate</li>
           <li>• A {redemptionFeeRate ? formatPercentage(redemptionFeeRate) : '0.5%'} fee applies</li>
           <li>• Vaults below MCR are skipped</li>
@@ -263,7 +193,7 @@ export function RedemptionCard() {
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How redemptions work</p>
         <ul className="text-sm text-primary-800 space-y-1">
           <li>• Burn your crdUSD to receive wCTC at oracle price</li>
-          <li>• Protocol targets lowest-interest vaults first</li>
+          <li>• Protocol targets lowest-APR vaults first (prefers larger loans on ties)</li>
           <li>• Great arbitrage when crdUSD trades below $1</li>
           <li>• Helps maintain the crdUSD peg</li>
         </ul>
