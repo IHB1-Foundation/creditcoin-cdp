@@ -220,6 +220,76 @@ contract CreditCDPTest is Test {
         assertTrue(bobDebtAfter <= bobDebtBefore, "higher interest vault should not increase");
     }
 
+    function testRedeemWithCapSkipsHighAPR() public {
+        // Alice 2% APR
+        vm.startPrank(alice);
+        wctc.wrap{value: 10 ether}();
+        wctc.approve(address(vaultManager), 10 ether);
+        uint256 aliceVault = vaultManager.openVault(10 ether, 5_000e18, 0.02e18);
+        vm.stopPrank();
+
+        // Bob 8% APR
+        vm.startPrank(bob);
+        wctc.wrap{value: 10 ether}();
+        wctc.approve(address(vaultManager), 10 ether);
+        uint256 bobVault = vaultManager.openVault(10 ether, 5_000e18, 0.08e18);
+        vm.stopPrank();
+
+        // Charlie funds redemption
+        vm.startPrank(charlie);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        vaultManager.openVault(20 ether, 5_000e18);
+
+        uint256 aliceBefore = vaultManager.getVault(aliceVault).debt;
+        uint256 bobBefore = vaultManager.getVault(bobVault).debt;
+
+        // Cap at 3% APR -> should only target Alice (2%), skip Bob (8%)
+        rusd.approve(address(vaultManager), 2_000e18);
+        uint256 collateralReceived = vaultManager.redeemWithCap(2_000e18, charlie, 0.03e18);
+        assertTrue(collateralReceived > 0);
+
+        uint256 aliceAfter = vaultManager.getVault(aliceVault).debt;
+        uint256 bobAfter = vaultManager.getVault(bobVault).debt;
+        assertTrue(aliceAfter < aliceBefore, "Alice (2%) should be redeemed");
+        assertEq(bobAfter, bobBefore, "Bob (8%) should be skipped by cap");
+        vm.stopPrank();
+    }
+
+    function testTieBreakPreference() public {
+        // Same APR 3%, different debts
+        vm.startPrank(alice);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        uint256 vSmall = vaultManager.openVault(10 ether, 3_000e18, 0.03e18); // smaller debt
+        uint256 vLarge = vaultManager.openVault(10 ether, 7_000e18, 0.03e18); // larger debt
+        vm.stopPrank();
+
+        // Fund redeemer
+        vm.startPrank(bob);
+        wctc.wrap{value: 30 ether}();
+        wctc.approve(address(vaultManager), 30 ether);
+        vaultManager.openVault(30 ether, 5_000e18);
+
+        uint256 smallBefore = vaultManager.getVault(vSmall).debt;
+        uint256 largeBefore = vaultManager.getVault(vLarge).debt;
+
+        // Prefer larger debt first
+        rusd.approve(address(vaultManager), 1_000e18);
+        vaultManager.redeemAdvanced(1_000e18, bob, type(uint256).max, true);
+        uint256 smallMid = vaultManager.getVault(vSmall).debt;
+        uint256 largeMid = vaultManager.getVault(vLarge).debt;
+        assertTrue(largeMid < largeBefore, "larger debt first when preferLargerDebt=true");
+        assertEq(smallMid, smallBefore, "smaller untouched in first redeem");
+
+        // Now prefer smaller debt
+        rusd.approve(address(vaultManager), 1_000e18);
+        vaultManager.redeemAdvanced(1_000e18, bob, type(uint256).max, false);
+        uint256 smallAfter = vaultManager.getVault(vSmall).debt;
+        assertTrue(smallAfter < smallMid, "smaller debt redeemed when preferLargerDebt=false");
+        vm.stopPrank();
+    }
+
     function testGetTotalDebtCurrentAndInterestStats() public {
         // Setup two vaults with different interest and debts
         vm.startPrank(alice);

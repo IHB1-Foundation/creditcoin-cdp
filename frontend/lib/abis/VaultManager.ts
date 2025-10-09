@@ -50,6 +50,29 @@ export const VaultManagerABI = [
   },
   {
     type: 'function',
+    name: 'redeemWithCap',
+    inputs: [
+      { name: 'rUSDAmount', type: 'uint256' },
+      { name: 'receiver', type: 'address' },
+      { name: 'maxInterestRate', type: 'uint256' },
+    ],
+    outputs: [{ name: 'collateralRedeemed', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'redeemAdvanced',
+    inputs: [
+      { name: 'rUSDAmount', type: 'uint256' },
+      { name: 'receiver', type: 'address' },
+      { name: 'maxInterestRate', type: 'uint256' },
+      { name: 'preferLargerDebt', type: 'bool' },
+    ],
+    outputs: [{ name: 'collateralRedeemed', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'getVaultBasic',
     inputs: [{ name: 'vaultId', type: 'uint256' }],
     outputs: [

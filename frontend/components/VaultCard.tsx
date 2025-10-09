@@ -43,6 +43,17 @@ export function VaultCard() {
     }
   }, [vaultInterest]);
 
+  // Persist and restore selected vault id via localStorage for cross-component visibility (Header)
+  useEffect(() => {
+    if (!vaultIds || vaultIds.length === 0) return;
+    const stored = typeof window !== 'undefined' ? window.localStorage.getItem('selectedVaultId') : null;
+    if (stored) {
+      const storedId = BigInt(stored as string);
+      const idx = vaultIds.findIndex((id) => id === storedId);
+      if (idx >= 0) setSelectedVaultIndex(idx);
+    }
+  }, [vaultIds]);
+
   const vaultId = vaultIds?.[selectedVaultIndex];
   const { vault, collateralRatio, interestRate: vaultInterest, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(vaultId);
   const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
@@ -216,7 +227,11 @@ export function VaultCard() {
   const healthStatus = vault && collateralRatio && mcr ? getHealthStatus(collateralRatio, mcr) : null;
   const liquidationPrice = vault && mcr && price ? calculateLiquidationPrice(vault.collateral, vault.debt, mcr) : undefined;
 
-  const vaultsSubtitle = vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet';
+  let vaultsSubtitle = vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet';
+  if (vaultInterest !== undefined && vaultId !== undefined && !vaultLoading) {
+    const apr = (Number(vaultInterest) * 100 / 1e18).toFixed(2);
+    vaultsSubtitle = `${vaultsSubtitle} • Current APR: ${apr}%`;
+  }
 
   return (
     <Card title="My Vaults" subtitle={vaultsSubtitle}>
@@ -227,7 +242,15 @@ export function VaultCard() {
           <select
             className="px-3 py-2 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-primary-500"
             value={selectedVaultIndex}
-            onChange={(e) => setSelectedVaultIndex(Number(e.target.value))}
+            onChange={(e) => {
+              const idx = Number(e.target.value);
+              setSelectedVaultIndex(idx);
+              if (vaultIds && vaultIds[idx] !== undefined) {
+                if (typeof window !== 'undefined') {
+                  window.localStorage.setItem('selectedVaultId', vaultIds[idx].toString());
+                }
+              }
+            }}
           >
             {vaultIds.map((id, idx) => (
               <option key={idx} value={idx}>
@@ -412,6 +435,14 @@ export function VaultCard() {
             </div>
           )}
 
+          {/* Selected interest preview */}
+          <div className="-mt-1 text-xs text-gray-500">
+            Selected interest: <span className="font-medium">{(() => {
+              const rateNum = Number(interestRate);
+              return isNaN(rateNum) ? '--' : `${rateNum.toFixed(2)}%`;
+            })()}</span> APR
+          </div>
+
           <Button
             className="w-full"
             onClick={handleOpenVault}
@@ -500,6 +531,9 @@ export function VaultCard() {
                       <span className="mr-2">Projected ratio:</span>
                       <span className={health.color}>{formatPercentage(ratio)}</span>
                       <span className="ml-2 text-xs text-gray-500">(min {formatPercentage(mcr)})</span>
+                      {vaultInterest !== undefined && (
+                        <span className="ml-3 text-xs text-gray-500">Current interest: <span className="font-medium">{(Number(vaultInterest) * 100 / 1e18).toFixed(2)}%</span> APR</span>
+                      )}
                     </div>
                   );
                 }

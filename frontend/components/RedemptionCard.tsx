@@ -21,12 +21,14 @@ export function RedemptionCard() {
   const { price } = useOracle();
 
   const [amount, setAmount] = useState('');
+  const [maxApr, setMaxApr] = useState(''); // optional APR cap in %
+  const [preferLargerDebt, setPreferLargerDebt] = useState(true);
   const amountBigInt = amount ? parseToBigInt(amount) : undefined;
 
   const { estimatedCollateral, grossCollateral, feeAmount, redemptionFeeRate } = useRedemptionEstimate(amountBigInt);
   const { redeem, isPending: isRedeeming, isSuccess: redeemSuccess } = useRedeem();
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
-  const { minRate, maxRate } = useInterestStats();
+  const { minRate, maxRate, weightedAvgRate } = useInterestStats();
 
   // Refetch data when transactions succeed
   useEffect(() => {
@@ -67,7 +69,18 @@ export function RedemptionCard() {
         return;
       }
 
-      await redeem(redeemAmount, address);
+      // Optional APR cap
+      let capWad: bigint | undefined = undefined;
+      if (maxApr) {
+        const capNum = Number(maxApr);
+        if (isNaN(capNum) || capNum < 0 || capNum > 10) {
+          toast.error('Max APR cap must be between 0% and 10%');
+          return;
+        }
+        capWad = parseToBigInt((capNum / 100).toString());
+      }
+
+      await redeem(redeemAmount, address, capWad, preferLargerDebt);
     } catch (error) {
       // Error handling in hook
     }
@@ -102,6 +115,67 @@ export function RedemptionCard() {
             </button>
           }
         />
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">Max APR to target (%)</label>
+            <span className="text-xs text-gray-500">Optional • 0 - 10</span>
+          </div>
+          {/* Quick-select presets */}
+          <div className="mb-2 flex gap-2">
+            {["1.0", "3.0", "5.0"].map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`px-2 py-1 text-xs rounded border ${maxApr === p ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-700'}`}
+                onClick={() => setMaxApr(p)}
+              >
+                {p}%
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`px-2 py-1 text-xs rounded border ${maxApr === '' ? 'bg-gray-50 border-gray-200 text-gray-700' : 'bg-white border-gray-200 text-gray-700'}`}
+              onClick={() => setMaxApr('')}
+            >
+              No cap
+            </button>
+          </div>
+          <Input
+            type="number"
+            placeholder="e.g., 3.0"
+            value={maxApr}
+            onChange={(e) => setMaxApr(e.target.value)}
+          />
+          <p className="mt-1 text-xs text-gray-500">Vaults above this APR are skipped.</p>
+        </div>
+
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">Tie Preference</label>
+            <span className="text-xs text-gray-500">Among equal APR vaults</span>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="tiePref"
+                checked={preferLargerDebt}
+                onChange={() => setPreferLargerDebt(true)}
+              />
+              Prefer larger debt first
+            </label>
+            <label className="inline-flex items-center gap-2">
+              <input
+                type="radio"
+                name="tiePref"
+                checked={!preferLargerDebt}
+                onChange={() => setPreferLargerDebt(false)}
+              />
+              Prefer smaller debt first
+            </label>
+          </div>
+        </div>
 
         <div className="text-xs text-gray-500">
           Available: <span className="font-medium text-gray-700">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'}</span> crdUSD
@@ -153,6 +227,11 @@ export function RedemptionCard() {
               <>
                 {' '}Current range: <span className="font-medium">{minRate ? `${(Number(minRate) * 100 / 1e18).toFixed(2)}%` : '--'}</span>
                 {' '}– <span className="font-medium">{maxRate ? `${(Number(maxRate) * 100 / 1e18).toFixed(2)}%` : '--'}</span> APR.
+              </>
+            )}
+            {weightedAvgRate !== undefined && (
+              <>
+                {' '}• Weighted Avg APR: <span className="font-medium">{(Number(weightedAvgRate) * 100 / 1e18).toFixed(2)}%</span>
               </>
             )}
           </p>

@@ -4,7 +4,11 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { Button } from './ui/Button';
 import { shortenAddress } from '@/lib/utils';
 import { useTokenBalances } from '@/hooks/useTokens';
-import { useInterestStats } from '@/hooks/useVault';
+import { useInterestStats, useUserVaults } from '@/hooks/useVault';
+import { useReadContract } from 'wagmi';
+import { CONTRACTS } from '@/lib/config';
+import { VaultManagerABI } from '@/lib/abis/VaultManager';
+import { Tooltip } from './ui/Tooltip';
 import { formatBigInt } from '@/lib/utils';
 
 export function Header() {
@@ -12,7 +16,21 @@ export function Header() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { wctcBalance, rusdBalance } = useTokenBalances();
-  const { minRate } = useInterestStats();
+  const { minRate, weightedAvgRate, maxRate } = useInterestStats();
+  const { vaultIds } = useUserVaults();
+
+  // Read currently selected vault id from localStorage and fetch its interest
+  const selectedVaultIdStr = typeof window !== 'undefined' ? window.localStorage.getItem('selectedVaultId') : null;
+  const selectedVaultId = selectedVaultIdStr ? (BigInt(selectedVaultIdStr) as unknown as bigint) : undefined;
+  const { data: currentVaultInterest } = useReadContract({
+    address: CONTRACTS.VAULT_MANAGER,
+    abi: VaultManagerABI,
+    functionName: 'getVaultInterest',
+    args: selectedVaultId !== undefined ? [selectedVaultId] : undefined,
+    query: {
+      enabled: !!selectedVaultId,
+    },
+  });
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200/80 shadow-sm">
@@ -30,9 +48,30 @@ export function Header() {
 
           <div className="flex items-center space-x-4">
             {minRate !== undefined && (
-              <div className="hidden md:flex items-center px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-700">
-                Lowest APR: <span className="ml-1 font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
-              </div>
+              <Tooltip
+                content={
+                  <span>
+                    Min: {(Number(minRate) * 100 / 1e18).toFixed(2)}% {weightedAvgRate !== undefined ? `• Weighted Avg: ${(Number(weightedAvgRate) * 100 / 1e18).toFixed(2)}%` : ''} {maxRate !== undefined ? `• Max: ${(Number(maxRate) * 100 / 1e18).toFixed(2)}%` : ''}
+                    {currentVaultInterest !== undefined ? ` • Current: ${(Number(currentVaultInterest as bigint) * 100 / 1e18).toFixed(2)}%` : ''}
+                  </span>
+                }
+              >
+                <div className="hidden md:flex items-center px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-700 cursor-default">
+                  APR: <span className="ml-1 font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
+                  {weightedAvgRate !== undefined && (
+                    <>
+                      <span className="mx-1">•</span>
+                      <span className="font-medium">{(Number(weightedAvgRate) * 100 / 1e18).toFixed(2)}%</span>
+                    </>
+                  )}
+                  {currentVaultInterest !== undefined && (
+                    <>
+                      <span className="mx-1">•</span>
+                      <span className="font-medium">{(Number(currentVaultInterest as bigint) * 100 / 1e18).toFixed(2)}%</span>
+                    </>
+                  )}
+                </div>
+              </Tooltip>
             )}
             {isConnected && address && (
               <div className="hidden md:flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">

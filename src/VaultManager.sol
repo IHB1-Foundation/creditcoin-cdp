@@ -374,43 +374,96 @@ contract VaultManager {
         external
         returns (uint256 collateralRedeemed)
     {
+        return _redeemCore(rUSDAmount, receiver, type(uint256).max);
+    }
+
+    /**
+     * @notice Redeem with an interest cap; skips vaults above maxInterestRate
+     * @param rUSDAmount Amount of crdUSD to burn
+     * @param receiver Recipient for collateral
+     * @param maxInterestRate Maximum acceptable APR (WAD, e.g., 0.05e18 for 5%). Use type(uint256).max for no cap.
+     */
+    function redeemWithCap(uint256 rUSDAmount, address receiver, uint256 maxInterestRate)
+        external
+        returns (uint256 collateralRedeemed)
+    {
+        return _redeemCore(rUSDAmount, receiver, maxInterestRate);
+    }
+
+    function redeemAdvanced(
+        uint256 rUSDAmount,
+        address receiver,
+        uint256 maxInterestRate,
+        bool preferLargerDebt
+    ) external returns (uint256 collateralRedeemed) {
+        return _redeemCoreWithTie(rUSDAmount, receiver, maxInterestRate, preferLargerDebt);
+    }
+
+    function _redeemCore(uint256 rUSDAmount, address receiver, uint256 maxInterestRate)
+        private
+        returns (uint256 collateralRedeemed)
+    {
         if (rUSDAmount == 0) revert ZeroAmount();
         if (receiver == address(0)) revert ZeroAddress();
 
-        // Get current price
         uint256 price = oracle.getPrice();
 
-        // Find vaults sorted by interest (lowest first)
-        uint256[] memory sortedVaultIds = _getSortedVaultsByInterest();
+        // Build heap of active vaults (ids, rates, debts)
+        uint256 n;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            if (vaults[i].owner != address(0) && vaults[i].debt > 0) n++;
+        }
+        if (n == 0) revert InsufficientRedeemableVaults();
 
-        if (sortedVaultIds.length == 0) revert InsufficientRedeemableVaults();
+        uint256[] memory ids = new uint256[](n);
+        uint256[] memory rates = new uint256[](n);
+        uint256[] memory debts = new uint256[](n);
+        uint256 k;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage v = vaults[i];
+            if (v.owner != address(0) && v.debt > 0) {
+                ids[k] = i;
+                rates[k] = v.interestRate;
+                debts[k] = v.debt;
+                k++;
+            }
+        }
+        // Build min-heap
+        for (int256 i = int256(n / 2) - 1; i >= 0; i--) {
+            _heapify3(rates, ids, debts, uint256(i), n);
+        }
 
         uint256 remainingDebt = rUSDAmount;
         uint256 totalCollateralRedeemed = 0;
+        uint256 heapSize = n;
 
-        // Redeem from vaults starting with lowest interest
-        for (uint256 i = 0; i < sortedVaultIds.length && remainingDebt > 0; i++) {
-            uint256 vaultId = sortedVaultIds[i];
-            Vault storage vault = vaults[vaultId];
+        while (heapSize > 0 && remainingDebt > 0) {
+            uint256 vid = ids[0];
+            Vault storage vault = vaults[vid];
 
-            // Skip closed or liquidatable vaults
+            // Pop root for now
+            ids[0] = ids[heapSize - 1];
+            rates[0] = rates[heapSize - 1];
+            debts[0] = debts[heapSize - 1];
+            heapSize--;
+            _heapify3(rates, ids, debts, 0, heapSize);
+
+            // Validate and process vault
             if (vault.owner == address(0) || vault.debt == 0) continue;
 
-            // Accrue interest on this vault before redeeming
+            // Interest cap filter
+            if (maxInterestRate != type(uint256).max && vault.interestRate > maxInterestRate) continue;
+
+            // Accrue interest before check/redeem
             _accrueInterest(vault);
 
-            // Check if vault is below MCR (skip if liquidatable)
+            // Skip if below MCR
             uint256 collateralValue = (vault.collateral * price) / PRECISION;
             uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
             if (collateralValue < requiredCollateral) continue;
 
-            // Calculate how much debt to redeem from this vault
             uint256 debtToRedeem = remainingDebt > vault.debt ? vault.debt : remainingDebt;
-
-            // Calculate collateral to return (1:1 USD value at oracle price)
             uint256 collateralToRedeem = (debtToRedeem * PRECISION) / price;
-
-            // Ensure we don't redeem more collateral than vault has
             if (collateralToRedeem > vault.collateral) {
                 collateralToRedeem = vault.collateral;
                 debtToRedeem = (collateralToRedeem * price) / PRECISION;
@@ -421,58 +474,184 @@ contract VaultManager {
             vault.debt -= debtToRedeem;
             vault.timestamp = block.timestamp;
 
-            // If vault debt goes below minimum, close it
+            // Close if below min debt
             if (vault.debt > 0 && vault.debt < MIN_DEBT) {
-                // Return remaining collateral to vault owner
                 if (vault.collateral > 0) {
                     if (!collateralToken.transfer(vault.owner, vault.collateral)) {
                         revert TransferFailed();
                     }
                     totalCollateral -= vault.collateral;
                 }
-
-                // Clear the vault
                 address vaultOwner = vault.owner;
-                delete vaults[vaultId];
-                emit VaultClosed(vaultId, vaultOwner);
+                delete vaults[vid];
+                emit VaultClosed(vid, vaultOwner);
             }
 
-            // Update tracking
             totalCollateralRedeemed += collateralToRedeem;
             remainingDebt -= debtToRedeem;
-
-            // Update global state
             totalCollateral -= collateralToRedeem;
             totalDebt -= debtToRedeem;
-
-            emit VaultRedeemed(vaultId, debtToRedeem, collateralToRedeem);
+            emit VaultRedeemed(vid, debtToRedeem, collateralToRedeem);
         }
 
         if (totalCollateralRedeemed == 0) revert InsufficientRedeemableVaults();
 
-        // Calculate redemption fee
         uint256 fee = (totalCollateralRedeemed * redemptionFee) / PRECISION;
         uint256 collateralToReceiver = totalCollateralRedeemed - fee;
-
-        // Burn crdUSD from caller
         uint256 actualBurned = rUSDAmount - remainingDebt;
         stablecoin.burn(msg.sender, actualBurned);
-
-        // Transfer collateral to receiver
-        if (!collateralToken.transfer(receiver, collateralToReceiver)) {
-            revert TransferFailed();
-        }
-
-        // Transfer fee to treasury
+        if (!collateralToken.transfer(receiver, collateralToReceiver)) revert TransferFailed();
         if (fee > 0) {
-            if (!collateralToken.transfer(address(treasury), fee)) {
-                revert TransferFailed();
+            if (!collateralToken.transfer(address(treasury), fee)) revert TransferFailed();
+        }
+        emit RedemptionExecuted(msg.sender, receiver, actualBurned, collateralToReceiver, fee);
+        return collateralToReceiver;
+    }
+
+    /**
+     * @notice Internal redeem core with tie preference selector
+     */
+    function _redeemCoreWithTie(
+        uint256 rUSDAmount,
+        address receiver,
+        uint256 maxInterestRate,
+        bool preferLargerDebt
+    ) private returns (uint256 collateralRedeemed) {
+        if (rUSDAmount == 0) revert ZeroAmount();
+        if (receiver == address(0)) revert ZeroAddress();
+
+        uint256 price = oracle.getPrice();
+
+        uint256 n;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            if (vaults[i].owner != address(0) && vaults[i].debt > 0) n++;
+        }
+        if (n == 0) revert InsufficientRedeemableVaults();
+
+        uint256[] memory ids = new uint256[](n);
+        uint256[] memory rates = new uint256[](n);
+        uint256[] memory debts = new uint256[](n);
+        uint256 k;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage v = vaults[i];
+            if (v.owner != address(0) && v.debt > 0) {
+                ids[k] = i;
+                rates[k] = v.interestRate;
+                debts[k] = v.debt;
+                k++;
             }
         }
 
-        emit RedemptionExecuted(msg.sender, receiver, actualBurned, collateralToReceiver, fee);
+        // Build heap with chosen tie-break preference
+        if (preferLargerDebt) {
+            for (int256 i = int256(n / 2) - 1; i >= 0; i--) {
+                _heapify3(rates, ids, debts, uint256(i), n);
+            }
+        } else {
+            for (int256 i = int256(n / 2) - 1; i >= 0; i--) {
+                _heapify3Small(rates, ids, debts, uint256(i), n);
+            }
+        }
 
+        uint256 remainingDebt = rUSDAmount;
+        uint256 totalCollateralRedeemed = 0;
+        uint256 heapSize = n;
+
+        while (heapSize > 0 && remainingDebt > 0) {
+            uint256 vid = ids[0];
+            Vault storage vault = vaults[vid];
+
+            // Pop root
+            ids[0] = ids[heapSize - 1];
+            rates[0] = rates[heapSize - 1];
+            debts[0] = debts[heapSize - 1];
+            heapSize--;
+            if (preferLargerDebt) {
+                _heapify3(rates, ids, debts, 0, heapSize);
+            } else {
+                _heapify3Small(rates, ids, debts, 0, heapSize);
+            }
+
+            if (vault.owner == address(0) || vault.debt == 0) continue;
+            if (maxInterestRate != type(uint256).max && vault.interestRate > maxInterestRate) continue;
+
+            _accrueInterest(vault);
+
+            uint256 collateralValue = (vault.collateral * price) / PRECISION;
+            uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
+            if (collateralValue < requiredCollateral) continue;
+
+            uint256 debtToRedeem = remainingDebt > vault.debt ? vault.debt : remainingDebt;
+            uint256 collateralToRedeem = (debtToRedeem * PRECISION) / price;
+            if (collateralToRedeem > vault.collateral) {
+                collateralToRedeem = vault.collateral;
+                debtToRedeem = (collateralToRedeem * price) / PRECISION;
+            }
+
+            vault.collateral -= collateralToRedeem;
+            vault.debt -= debtToRedeem;
+            vault.timestamp = block.timestamp;
+
+            if (vault.debt > 0 && vault.debt < MIN_DEBT) {
+                if (vault.collateral > 0) {
+                    if (!collateralToken.transfer(vault.owner, vault.collateral)) revert TransferFailed();
+                    totalCollateral -= vault.collateral;
+                }
+                address vaultOwner = vault.owner;
+                delete vaults[vid];
+                emit VaultClosed(vid, vaultOwner);
+            }
+
+            totalCollateralRedeemed += collateralToRedeem;
+            remainingDebt -= debtToRedeem;
+            totalCollateral -= collateralToRedeem;
+            totalDebt -= debtToRedeem;
+            emit VaultRedeemed(vid, debtToRedeem, collateralToRedeem);
+        }
+
+        if (totalCollateralRedeemed == 0) revert InsufficientRedeemableVaults();
+
+        uint256 fee = (totalCollateralRedeemed * redemptionFee) / PRECISION;
+        uint256 collateralToReceiver = totalCollateralRedeemed - fee;
+        uint256 actualBurned = rUSDAmount - remainingDebt;
+        stablecoin.burn(msg.sender, actualBurned);
+        if (!collateralToken.transfer(receiver, collateralToReceiver)) revert TransferFailed();
+        if (fee > 0) {
+            if (!collateralToken.transfer(address(treasury), fee)) revert TransferFailed();
+        }
+        emit RedemptionExecuted(msg.sender, receiver, actualBurned, collateralToReceiver, fee);
         return collateralToReceiver;
+    }
+
+    // Heap with smaller debt tie-break
+    function _heapify3Small(uint256[] memory rates, uint256[] memory ids, uint256[] memory debts, uint256 i, uint256 heapSize) private pure {
+        while (true) {
+            uint256 smallest = i;
+            uint256 l = 2 * i + 1;
+            uint256 r = 2 * i + 2;
+            if (l < heapSize && _less3Small(rates[l], debts[l], ids[l], rates[smallest], debts[smallest], ids[smallest])) {
+                smallest = l;
+            }
+            if (r < heapSize && _less3Small(rates[r], debts[r], ids[r], rates[smallest], debts[smallest], ids[smallest])) {
+                smallest = r;
+            }
+            if (smallest == i) break;
+            uint256 tr = rates[i]; rates[i] = rates[smallest]; rates[smallest] = tr;
+            uint256 td = debts[i]; debts[i] = debts[smallest]; debts[smallest] = td;
+            uint256 tid = ids[i]; ids[i] = ids[smallest]; ids[smallest] = tid;
+            i = smallest;
+        }
+    }
+
+    function _less3Small(
+        uint256 rateA, uint256 debtA, uint256 idA,
+        uint256 rateB, uint256 debtB, uint256 idB
+    ) private pure returns (bool) {
+        if (rateA < rateB) return true;
+        if (rateA > rateB) return false;
+        if (debtA < debtB) return true; // prefer smaller debt
+        if (debtA > debtB) return false;
+        return idA < idB;
     }
 
     /**
@@ -831,48 +1010,113 @@ contract VaultManager {
     }
 
     /**
-     * @notice Get all active vaults sorted by interest rate (ascending)
-     * @dev Simple bubble sort for MVP
+     * @notice Get all active vaults sorted by interest rate (ascending), tie-broken by vaultId (ascending)
+     * @dev Builds a min-heap in memory for O(n log n) ordering within a single call
      */
     function _getSortedVaultsByInterest() private view returns (uint256[] memory sortedIds) {
-        uint256 activeCount = 0;
+        uint256 n = 0;
         for (uint256 i = 1; i < nextVaultId; i++) {
             if (vaults[i].owner != address(0) && vaults[i].debt > 0) {
-                activeCount++;
+                n++;
             }
         }
+        if (n == 0) return new uint256[](0);
 
-        if (activeCount == 0) {
-            return new uint256[](0);
-        }
-
-        sortedIds = new uint256[](activeCount);
-        uint256[] memory rates = new uint256[](activeCount);
-
-        uint256 index = 0;
+        uint256[] memory ids = new uint256[](n);
+        uint256[] memory rates = new uint256[](n);
+        uint256 k = 0;
         for (uint256 i = 1; i < nextVaultId; i++) {
             Vault storage v = vaults[i];
             if (v.owner != address(0) && v.debt > 0) {
-                sortedIds[index] = i;
-                rates[index] = v.interestRate;
-                index++;
+                ids[k] = i;
+                rates[k] = v.interestRate;
+                k++;
             }
         }
 
-        for (uint256 i = 0; i < activeCount; i++) {
-            for (uint256 j = i + 1; j < activeCount; j++) {
-                if (rates[j] < rates[i]) {
-                    uint256 tr = rates[i];
-                    rates[i] = rates[j];
-                    rates[j] = tr;
+        // Build min-heap (rates as primary key, ids as tie-breaker)
+        // heap size = n
+        for (int256 i = int256(n / 2) - 1; i >= 0; i--) {
+            _heapify(rates, ids, uint256(i), n);
+        }
 
-                    uint256 tid = sortedIds[i];
-                    sortedIds[i] = sortedIds[j];
-                    sortedIds[j] = tid;
-                }
-            }
+        sortedIds = new uint256[](n);
+        // Extract min one by one
+        for (uint256 i = 0; i < n; i++) {
+            // root (min) at index 0
+            sortedIds[i] = ids[0];
+            // Move last to root
+            ids[0] = ids[n - 1 - i];
+            rates[0] = rates[n - 1 - i];
+            // Heapify reduced heap of size (n - 1 - i)
+            _heapify(rates, ids, 0, n - 1 - i);
         }
         return sortedIds;
+    }
+
+    function _heapify(uint256[] memory rates, uint256[] memory ids, uint256 i, uint256 heapSize) private pure {
+        while (true) {
+            uint256 smallest = i;
+            uint256 l = 2 * i + 1;
+            uint256 r = 2 * i + 2;
+            if (l < heapSize && _less(rates[l], ids[l], rates[smallest], ids[smallest])) {
+                smallest = l;
+            }
+            if (r < heapSize && _less(rates[r], ids[r], rates[smallest], ids[smallest])) {
+                smallest = r;
+            }
+            if (smallest == i) break;
+            // swap i and smallest
+            uint256 tr = rates[i];
+            rates[i] = rates[smallest];
+            rates[smallest] = tr;
+            uint256 tid = ids[i];
+            ids[i] = ids[smallest];
+            ids[smallest] = tid;
+            i = smallest;
+        }
+    }
+
+    function _less(uint256 rateA, uint256 idA, uint256 rateB, uint256 idB) private pure returns (bool) {
+        if (rateA < rateB) return true;
+        if (rateA > rateB) return false;
+        // tie-break on id (older/smaller id first)
+        return idA < idB;
+    }
+
+    // Heap variant with debts for tie-breaking by larger debt first, then id
+    function _heapify3(uint256[] memory rates, uint256[] memory ids, uint256[] memory debts, uint256 i, uint256 heapSize) private pure {
+        while (true) {
+            uint256 smallest = i;
+            uint256 l = 2 * i + 1;
+            uint256 r = 2 * i + 2;
+            if (l < heapSize && _less3(rates[l], debts[l], ids[l], rates[smallest], debts[smallest], ids[smallest], true)) {
+                smallest = l;
+            }
+            if (r < heapSize && _less3(rates[r], debts[r], ids[r], rates[smallest], debts[smallest], ids[smallest], true)) {
+                smallest = r;
+            }
+            if (smallest == i) break;
+            // swap i and smallest
+            uint256 tr = rates[i]; rates[i] = rates[smallest]; rates[smallest] = tr;
+            uint256 td = debts[i]; debts[i] = debts[smallest]; debts[smallest] = td;
+            uint256 tid = ids[i]; ids[i] = ids[smallest]; ids[smallest] = tid;
+            i = smallest;
+        }
+    }
+
+    function _less3(
+        uint256 rateA, uint256 debtA, uint256 idA,
+        uint256 rateB, uint256 debtB, uint256 idB,
+        bool /*preferLargerDebt*/
+    ) private pure returns (bool) {
+        if (rateA < rateB) return true;
+        if (rateA > rateB) return false;
+        // keep larger debt first
+        if (debtA > debtB) return true;
+        if (debtA < debtB) return false;
+        // final tie-break on id asc
+        return idA < idB;
     }
 
     /**

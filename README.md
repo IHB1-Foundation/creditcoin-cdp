@@ -219,6 +219,32 @@ stablecoin.approve(address(vaultManager), redemptionAmount);
 uint256 wctcReceived = vaultManager.redeem(redemptionAmount, msg.sender);
 
 // wctcReceived = actual wCTC received (after 0.5% fee)
+
+// Advanced: Redeem with APR cap (skip vaults above 3% APR)
+uint256 wctcReceivedCapped = vaultManager.redeemWithCap(5_000e18, msg.sender, 0.03e18);
+
+// Advanced: Redeem with tie preference among equal APR vaults
+// preferLargerDebt=true targets larger debts first; false targets smaller first
+uint256 wctcReceivedAdvanced = vaultManager.redeemAdvanced(5_000e18, msg.sender, type(uint256).max, true);
+```
+
+### Advanced Redemption (APR Cap + Tie Preference)
+
+- Targeting: Redemptions prioritize the lowest-interest vaults first. Among equal APR vaults, the contract defaults to preferring larger debts first. You can override this behavior via `redeemAdvanced`.
+- APR Cap: Use `redeemWithCap` or `redeemAdvanced` to skip vaults above a maximum APR (WAD). Example: 3% APR cap = `0.03e18`.
+- Tie Preference: With `redeemAdvanced`, set `preferLargerDebt=true` to redeem from larger debts first (default), or `false` for smaller debts first.
+
+CLI helper script (requires `cast`):
+
+```bash
+# Env vars required
+export RPC_URL=...
+export PRIVATE_KEY=...
+export VAULT_MANAGER_ADDRESS=0x...
+
+# Usage: scripts/redeem_with_cap.sh <RUSD_AMOUNT> <RECEIVER> <MAX_APR_PERCENT> <PREFER_LARGER_DEBT>
+# Example: redeem 1000 crdUSD to receiver with 3% cap, prefer larger debts first
+scripts/redeem_with_cap.sh 1000 0xYourReceiver 3.0 true
 ```
 
 ## Project Structure

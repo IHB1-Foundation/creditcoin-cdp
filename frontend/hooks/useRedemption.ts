@@ -63,14 +63,35 @@ export function useRedeem() {
     hash,
   });
 
-  const redeem = async (rUSDAmount: bigint, receiver: `0x${string}`) => {
+  const redeem = async (
+    rUSDAmount: bigint,
+    receiver: `0x${string}`,
+    maxInterestRate?: bigint,
+    preferLargerDebt?: boolean,
+  ) => {
     try {
-      await writeContract({
-        address: CONTRACTS.VAULT_MANAGER,
-        abi: VaultManagerABI,
-        functionName: 'redeem',
-        args: [rUSDAmount, receiver],
-      });
+      if (maxInterestRate !== undefined && preferLargerDebt !== undefined) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'redeemAdvanced',
+          args: [rUSDAmount, receiver, maxInterestRate, preferLargerDebt],
+        });
+      } else if (maxInterestRate !== undefined) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'redeemWithCap',
+          args: [rUSDAmount, receiver, maxInterestRate],
+        });
+      } else {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'redeem',
+          args: [rUSDAmount, receiver],
+        });
+      }
     } catch (err: any) {
       toast.error(formatError(err));
       throw err;
