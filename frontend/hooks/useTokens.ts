@@ -1,4 +1,4 @@
-import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
 import { CONTRACTS } from '@/lib/config';
 import { ERC20ABI } from '@/lib/abis/ERC20';
 import { WCTCABI } from '@/lib/abis/WCTC';
@@ -10,15 +10,10 @@ import { formatError } from '@/lib/utils';
  */
 export function useTokenBalances() {
   const { address } = useAccount();
+  const { data: nativeBal } = useBalance({ address, query: { enabled: !!address } });
 
   const { data, isLoading, refetch } = useReadContracts({
     contracts: [
-      {
-        address: CONTRACTS.WCTC,
-        abi: WCTCABI,
-        functionName: 'balanceOf',
-        args: address ? [address] : undefined,
-      },
       {
         address: CONTRACTS.RUSD,
         abi: ERC20ABI,
@@ -32,8 +27,8 @@ export function useTokenBalances() {
   });
 
   return {
-    wctcBalance: data?.[0]?.result as bigint | undefined,
-    rusdBalance: data?.[1]?.result as bigint | undefined,
+    tctcBalance: nativeBal?.value as bigint | undefined,
+    rusdBalance: data?.[0]?.result as bigint | undefined,
     isLoading,
     refetch,
   };
@@ -48,12 +43,6 @@ export function useAllowances(spender: `0x${string}`) {
   const { data, isLoading, refetch } = useReadContracts({
     contracts: [
       {
-        address: CONTRACTS.WCTC,
-        abi: WCTCABI,
-        functionName: 'allowance',
-        args: address && spender ? [address, spender] : undefined,
-      },
-      {
         address: CONTRACTS.RUSD,
         abi: ERC20ABI,
         functionName: 'allowance',
@@ -66,8 +55,7 @@ export function useAllowances(spender: `0x${string}`) {
   });
 
   return {
-    wctcAllowance: data?.[0]?.result as bigint | undefined,
-    rusdAllowance: data?.[1]?.result as bigint | undefined,
+    rusdAllowance: data?.[0]?.result as bigint | undefined,
     isLoading,
     refetch,
   };

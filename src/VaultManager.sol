@@ -549,7 +549,7 @@ contract VaultManager {
     {
         // Reuse core path to select vaults and compute total wCTC redeemed
         uint256 beforeWCTC = IERC20(address(collateralToken)).balanceOf(address(this));
-        uint256 wctcAmount = _redeemCore(rUSDAmount, address(this), type(uint256).max);
+        _redeemCore(rUSDAmount, address(this), type(uint256).max);
         // _redeemCore transferred wCTC to receiver; but we passed address(this)
         // so we must adjust: revert to internal variant that doesn't transfer. To keep minimal changes,
         // we compute delta and unwrap only the net amount.
@@ -986,13 +986,13 @@ contract VaultManager {
     /**
      * @notice Check if a vault can be liquidated
      * @param vaultId ID of the vault
-     * @return canLiquidate True if vault is below MCR
+     * @return isLiquidatable True if vault is below MCR
      */
     function canLiquidate(uint256 vaultId)
         external
         view
         vaultExists(vaultId)
-        returns (bool canLiquidate)
+        returns (bool isLiquidatable)
     {
         Vault storage vault = vaults[vaultId];
         uint256 currentDebt = _accruedDebtView(vault);
@@ -1046,6 +1046,7 @@ contract VaultManager {
      * @return minRate Minimum interest rate among active vaults
      * @return maxRate Maximum interest rate among active vaults
      * @return avgRate Average interest rate among active vaults
+     * @return weightedAvgRate Debt-weighted average interest rate among active vaults
      * @return count Number of active vaults considered
      */
     function getInterestStats()

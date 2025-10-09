@@ -6,7 +6,7 @@ A modern, minimal, and fully functional frontend for the Credit CDP Protocol bui
 
 - ✅ **Vault Management**: Open, adjust, and close collateralized vaults
 - ✅ **Stability Pool**: Deposit crdUSD and earn liquidation rewards
-- ✅ **Redemption**: Burn crdUSD to receive wCTC at oracle price
+- ✅ **Redemption**: Burn crdUSD to receive tCTC at oracle price
   - Targets lowest-APR vaults first; prefers larger loans on ties
 - ✅ **Real-time Data**: Direct contract reads, no subgraph needed
 - ✅ **Wallet Integration**: MetaMask support via Wagmi
@@ -60,7 +60,7 @@ NEXT_PUBLIC_RPC_URL=https://creditcoin-testnet.rpc.url
 NEXT_PUBLIC_BLOCK_EXPLORER=https://creditcoin-testnet.explorer.url
 
 # Contract Addresses (from deployment)
-NEXT_PUBLIC_WCTC_ADDRESS=0x...
+NEXT_PUBLIC_WCTC_ADDRESS=0x...  # internal only
 NEXT_PUBLIC_RUSD_ADDRESS=0x...
 NEXT_PUBLIC_VAULT_MANAGER_ADDRESS=0x...
 NEXT_PUBLIC_STABILITY_POOL_ADDRESS=0x...
@@ -173,7 +173,7 @@ Click "Connect Wallet" in the header to connect MetaMask to CreditCoin Testnet.
 3. Enter crdUSD amount
 4. Click "Deposit"
 5. Approve crdUSD if needed
-6. Claim wCTC gains when available
+6. Claim collateral gains when available
 
 ### 5. Redeem crdUSD for tCTC
 
@@ -227,7 +227,7 @@ You don't have enough tokens or native currency for gas fees.
 
 Update these in your `.env.local` file after deployment:
 
-- **WCTC**: Wrapped tCTC token
+- **WCTC**: Wrapped tCTC token (internal)
 - **Stablecoin**: crdUSD token
 - **VaultManager**: Main vault operations
 - **StabilityPool**: Stability pool contract

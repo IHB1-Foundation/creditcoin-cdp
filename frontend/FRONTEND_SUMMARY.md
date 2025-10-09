@@ -84,7 +84,7 @@ frontend/
 
 - ✅ MetaMask connection via Wagmi injected connector
 - ✅ Display connected address (shortened)
-- ✅ Show real-time wCTC and crdUSD balances
+- ✅ Show real-time tCTC (native) and crdUSD balances
 - ✅ Disconnect functionality
 - ✅ Responsive design (mobile-friendly)
 
@@ -103,11 +103,10 @@ useTokenBalances() // Display balances
 **File**: `components/VaultCard.tsx` (480 lines)
 
 #### Open Vault
-- ✅ Input collateral (wCTC) and debt (crdUSD)
+- ✅ Input collateral (tCTC native) and debt (crdUSD)
 - ✅ Show available balance
 - ✅ MAX button for convenience
-- ✅ Wrap tCTC → wCTC directly in UI
-- ✅ Auto-approval flow for wCTC
+  
 - ✅ Validate minimum debt (100 crdUSD)
 - ✅ Real-time collateral ratio preview
 
@@ -115,7 +114,7 @@ useTokenBalances() // Display balances
 - ✅ Select from user's vaults (dropdown)
 - ✅ Deposit/Withdraw collateral toggle
 - ✅ Borrow/Repay debt toggle
-- ✅ Auto-approval for wCTC/crdUSD as needed
+- ✅ Auto-approval for crdUSD as needed
 - ✅ Live vault statistics display
 
 #### Close Vault
@@ -153,7 +152,7 @@ useProtocolParams()      // Get MCR, fees, etc.
 
 - ✅ Deposit crdUSD to pool
 - ✅ Withdraw crdUSD from pool
-- ✅ Claim wCTC collateral gains
+- ✅ Claim collateral gains
 - ✅ Show individual deposit amount
 - ✅ Show pool share percentage
 - ✅ Display total pool size
@@ -164,7 +163,7 @@ useProtocolParams()      // Get MCR, fees, etc.
 **Statistics Shown**:
 - Your deposit amount
 - Your pool share (%)
-- Collateral gains (wCTC)
+- Collateral gains (tCTC)
 - Total pool size
 
 **Hooks Used**:
@@ -172,7 +171,7 @@ useProtocolParams()      // Get MCR, fees, etc.
 useStabilityPoolData()      // Get deposit & gains
 useStabilityDeposit()       // Deposit to pool
 useStabilityWithdraw()      // Withdraw from pool
-useClaimCollateralGain()    // Claim wCTC rewards
+useClaimCollateralGain()    // Claim collateral rewards
 ```
 
 ---
@@ -182,7 +181,7 @@ useClaimCollateralGain()    // Claim wCTC rewards
 **File**: `components/RedemptionCard.tsx`
 
 - ✅ Input crdUSD amount to redeem
-- ✅ Real-time estimate of wCTC to receive
+- ✅ Real-time estimate of tCTC to receive
 - ✅ Show gross collateral before fee
 - ✅ Display redemption fee breakdown
 - ✅ Show net collateral after fee
@@ -193,10 +192,10 @@ useClaimCollateralGain()    // Claim wCTC rewards
 
 **Estimate Display**:
 ```
-Gross Collateral: 2.5000 wCTC
-Redemption Fee (0.5%): -0.0125 wCTC
+Gross Collateral: 2.5000 tCTC
+Redemption Fee (0.5%): -0.0125 tCTC
 ────────────────────────────────
-You Will Receive: 2.4875 wCTC (≈ $4,975.00)
+You Will Receive: 2.4875 tCTC (≈ $4,975.00)
 ```
 
 **Hooks Used**:
@@ -211,7 +210,7 @@ useRedeem()                   // Execute redemption
 
 **File**: `components/OracleInfo.tsx`
 
-- ✅ wCTC oracle price with freshness indicator
+- ✅ tCTC oracle price with freshness indicator
 - ✅ Last update time (time ago format)
 - ✅ Minimum Collateral Ratio (MCR)
 - ✅ Borrowing fee percentage
@@ -249,8 +248,8 @@ useProtocolParams()    // → mcr, fees, totalDebt, totalCollateral
 ### Token Hooks (`hooks/useTokens.ts`)
 
 ```typescript
-useTokenBalances()     // → wctcBalance, rusdBalance
-useAllowances(spender) // → wctcAllowance, rusdAllowance
+useTokenBalances()     // → tctcBalance, rusdBalance
+useAllowances(spender) // → rusdAllowance
 useApprove()           // → approve(token, spender, amount)
 useWrap()              // → wrap(amount)
 useUnwrap()            // → unwrap(amount)
@@ -353,7 +352,7 @@ Display statistics with optional icon and subtitle:
 ```tsx
 <StatCard
   label="Collateral"
-  value="10.5 wCTC"
+  value="10.5 tCTC"
   subtitle="≈ $21,000"
 />
 ```
@@ -522,9 +521,8 @@ export const config = createConfig({
 - [ ] Disconnect works
 
 ### Vault Operations
-- [ ] Wrap tCTC to wCTC
 - [ ] Open vault with valid inputs
-- [ ] Approve wCTC automatically
+  
 - [ ] Adjust vault (deposit/withdraw)
 - [ ] Close vault with approval
 - [ ] Health factor updates

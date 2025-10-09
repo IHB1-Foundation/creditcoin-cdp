@@ -132,7 +132,7 @@ export function StabilityPoolCard() {
     : BigInt(0);
 
   return (
-    <Card title="Stability Pool" subtitle="Earn wCTC from liquidations">
+    <Card title="Stability Pool" subtitle="Earn collateral from liquidations">
       {/* Your Position */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {poolLoading && (
@@ -161,7 +161,7 @@ export function StabilityPoolCard() {
         />
         <StatCard
           label="Collateral Gains"
-          value={collateralGain !== undefined ? `${formatBigInt(collateralGain, 18, 4)} wCTC` : '--'}
+          value={collateralGain !== undefined ? `${formatBigInt(collateralGain, 18, 4)} tCTC` : '--'}
           subtitle={collateralGain && collateralGain > BigInt(0) ? 'Ready to claim' : 'No gains yet'}
         />
         <StatCard
@@ -179,7 +179,7 @@ export function StabilityPoolCard() {
             onClick={handleClaim}
             isLoading={isClaiming}
           >
-            Claim {formatBigInt(collateralGain, 18, 4)} wCTC
+            Claim {formatBigInt(collateralGain, 18, 4)} tCTC
           </Button>
         </div>
       )}
@@ -267,7 +267,7 @@ export function StabilityPoolCard() {
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How it works</p>
         <ul className="text-sm text-primary-800 space-y-1">
           <li>• Deposit crdUSD to help absorb liquidated debt</li>
-          <li>• Earn wCTC collateral from liquidations</li>
+          <li>• Earn collateral from liquidations</li>
           <li>• Your share proportional to pool deposit</li>
           <li>• Claim collateral gains anytime</li>
         </ul>

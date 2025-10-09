@@ -77,7 +77,7 @@ export function RedemptionCard() {
 
   if (!isConnected) {
     return (
-      <Card title="Redemption" subtitle="Redeem crdUSD for wCTC">
+      <Card title="Redemption" subtitle="Redeem crdUSD for tCTC">
         <div className="text-center py-12">
           <p className="text-gray-500">Connect your wallet to redeem</p>
         </div>

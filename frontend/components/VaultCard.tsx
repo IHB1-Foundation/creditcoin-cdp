@@ -57,25 +57,25 @@ export function VaultCard() {
       setNewInterest(percent.toString());
     }
   }, [vaultInterest]);
-  const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
+  const { tctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
 
   const { openVault, isPending: isOpening, isSuccess: openSuccess } = useOpenVault();
   const { adjustVault, isPending: isAdjusting, isSuccess: adjustSuccess } = useAdjustVault();
   const { closeVault, isPending: isClosing, isSuccess: closeSuccess } = useCloseVault();
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
-  const { wrap, isPending: isWrapping, isSuccess: wrapSuccess } = useWrap();
+  // Native zapper: no wrapping needed in UI
   const { updateInterest, isPending: isUpdatingInterest, isSuccess: updateInterestSuccess } = useUpdateInterest();
 
   // Refetch data when transactions succeed
   useEffect(() => {
-    if (openSuccess || adjustSuccess || closeSuccess || wrapSuccess || approveSuccess || updateInterestSuccess) {
+    if (openSuccess || adjustSuccess || closeSuccess || approveSuccess || updateInterestSuccess) {
       refetchVault();
       refetchVaultIds();
       refetchBalances();
       refetchAllowances();
     }
-  }, [openSuccess, adjustSuccess, closeSuccess, wrapSuccess, approveSuccess, updateInterestSuccess]);
+  }, [openSuccess, adjustSuccess, closeSuccess, approveSuccess, updateInterestSuccess]);
 
   // Reset form on success
   useEffect(() => {
@@ -152,14 +152,7 @@ export function VaultCard() {
         return;
       }
 
-      // Check approvals
-      if (isDeposit && collatDelta > BigInt(0)) {
-        if (wctcAllowance === undefined || wctcAllowance < collatDelta) {
-          toast('Approving wCTC...', { icon: '⏳' });
-          await approve('wctc', CONTRACTS.VAULT_MANAGER, collatDelta * BigInt(2));
-          return;
-        }
-      }
+      // For native deposits, no ERC20 approval is needed
 
       if (!isBorrow && debtDeltaBI > BigInt(0)) {
         if (rusdAllowance === undefined || rusdAllowance < debtDeltaBI) {
@@ -265,7 +258,7 @@ export function VaultCard() {
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Collateral"
-            value={`${formatCompactBigInt(vault.collateral)} wCTC`}
+            value={`${formatCompactBigInt(vault.collateral)} tCTC`}
             subtitle={price ? formatUSD((vault.collateral * price) / PROTOCOL_PARAMS.PRECISION) : undefined}
           />
           <StatCard
@@ -295,13 +288,13 @@ export function VaultCard() {
             label={
               <span className="inline-flex items-center gap-1">
                 Liquidation Price
-                <Tooltip content="wCTC price at which your vault reaches the minimum ratio.">
+                <Tooltip content="tCTC price at which your vault reaches the minimum ratio.">
                   <span><InfoIcon /></span>
                 </Tooltip>
               </span>
             }
             value={liquidationPrice ? formatUSD(liquidationPrice) : '--'}
-            subtitle="Per wCTC"
+            subtitle="Per tCTC"
           />
           <StatCard
             label="Interest"

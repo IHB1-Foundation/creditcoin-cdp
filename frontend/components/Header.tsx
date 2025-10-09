@@ -16,7 +16,7 @@ export function Header() {
   const { address, isConnected } = useAccount();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
-  const { wctcBalance, rusdBalance } = useTokenBalances();
+  const { tctcBalance, rusdBalance } = useTokenBalances();
   const { minRate, weightedAvgRate, maxRate } = useInterestStats();
   const { vaultIds } = useUserVaults();
 
@@ -85,9 +85,9 @@ export function Header() {
             {isConnected && address && (
               <div className="hidden md:flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">wCTC</p>
+                  <p className="text-xs text-gray-500">tCTC</p>
                   <p className="text-sm font-semibold text-gray-900">
-                    {wctcBalance !== undefined ? formatBigInt(wctcBalance, 18, 4) : '--'}
+                    {tctcBalance !== undefined ? formatBigInt(tctcBalance, 18, 4) : '--'}
                   </p>
                 </div>
                 <div className="w-px h-8 bg-gray-300" />

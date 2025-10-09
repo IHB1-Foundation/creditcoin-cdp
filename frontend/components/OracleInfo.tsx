@@ -47,7 +47,7 @@ export function OracleInfo() {
         )}
         {/* Oracle Price */}
         <StatCard
-          label="wCTC Price"
+          label="tCTC Price"
           value={
             <span className={isFresh === false ? 'text-error' : ''}>
               {price ? formatUSD(price) : '--'}
@@ -131,7 +131,7 @@ export function OracleInfo() {
         {/* Total Collateral */}
         <StatCard
           label="Total System Collateral"
-          value={totalCollateral ? `${formatCompactBigInt(totalCollateral, 18)} wCTC` : '--'}
+          value={totalCollateral ? `${formatCompactBigInt(totalCollateral, 18)} tCTC` : '--'}
           subtitle={
             totalCollateral && price
               ? formatUSD((totalCollateral * price) / BigInt(1e18))
