@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity 0.8.7;
 
 import "./interfaces/IInterfaces.sol";
 
@@ -33,6 +33,7 @@ contract VaultManager {
     // Parameters
     uint256 public minCollateralRatio;          // e.g., 1.3e18 = 130%
     uint256 public borrowingFee;                // e.g., 5e15 = 0.5%
+    uint256 public redemptionFee;               // e.g., 5e15 = 0.5%
 
     // State
     mapping(uint256 => Vault) public vaults;
@@ -66,6 +67,18 @@ contract VaultManager {
     event VaultClosed(uint256 indexed vaultId, address indexed owner);
     event LiquidationEngineSet(address indexed liquidationEngine);
     event ParametersUpdated(uint256 minCollateralRatio, uint256 borrowingFee);
+    event RedemptionExecuted(
+        address indexed redeemer,
+        address indexed receiver,
+        uint256 rUSDAmount,
+        uint256 wCTCReceived,
+        uint256 feeAmount
+    );
+    event VaultRedeemed(
+        uint256 indexed vaultId,
+        uint256 debtRedeemed,
+        uint256 collateralRedeemed
+    );
 
     // =============================================================
     //                           ERRORS
@@ -80,6 +93,8 @@ contract VaultManager {
     error ZeroAddress();
     error ZeroAmount();
     error TransferFailed();
+    error InsufficientRedeemableVaults();
+    error RedemptionAmountTooLarge();
 
     // =============================================================
     //                         CONSTRUCTOR
@@ -116,6 +131,7 @@ contract VaultManager {
 
         minCollateralRatio = _minCollateralRatio;
         borrowingFee = _borrowingFee;
+        redemptionFee = 5e15; // Default 0.5%
 
         owner = msg.sender;
         nextVaultId = 1; // Start vault IDs at 1
@@ -317,6 +333,155 @@ contract VaultManager {
     }
 
     // =============================================================
+    //                    REDEMPTION FUNCTIONS
+    // =============================================================
+
+    /**
+     * @notice Redeem rUSD for wCTC collateral from the riskiest vaults
+     * @dev Targets vaults with lowest collateral ratio first
+     * @param rUSDAmount Amount of rUSD to burn for redemption
+     * @param receiver Address to receive the redeemed wCTC
+     * @return collateralRedeemed Total amount of wCTC sent to receiver (after fee)
+     */
+    function redeem(uint256 rUSDAmount, address receiver)
+        external
+        returns (uint256 collateralRedeemed)
+    {
+        if (rUSDAmount == 0) revert ZeroAmount();
+        if (receiver == address(0)) revert ZeroAddress();
+
+        // Get current price
+        uint256 price = oracle.getPrice();
+
+        // Find vaults sorted by health (lowest collateral ratio first)
+        uint256[] memory sortedVaultIds = _getSortedVaultsByHealth();
+
+        if (sortedVaultIds.length == 0) revert InsufficientRedeemableVaults();
+
+        uint256 remainingDebt = rUSDAmount;
+        uint256 totalCollateralRedeemed = 0;
+
+        // Redeem from vaults starting with least healthy
+        for (uint256 i = 0; i < sortedVaultIds.length && remainingDebt > 0; i++) {
+            uint256 vaultId = sortedVaultIds[i];
+            Vault storage vault = vaults[vaultId];
+
+            // Skip closed or liquidatable vaults
+            if (vault.owner == address(0) || vault.debt == 0) continue;
+
+            // Check if vault is below MCR (skip if liquidatable)
+            uint256 collateralValue = (vault.collateral * price) / PRECISION;
+            uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
+            if (collateralValue < requiredCollateral) continue;
+
+            // Calculate how much debt to redeem from this vault
+            uint256 debtToRedeem = remainingDebt > vault.debt ? vault.debt : remainingDebt;
+
+            // Calculate collateral to return (1:1 USD value at oracle price)
+            uint256 collateralToRedeem = (debtToRedeem * PRECISION) / price;
+
+            // Ensure we don't redeem more collateral than vault has
+            if (collateralToRedeem > vault.collateral) {
+                collateralToRedeem = vault.collateral;
+                debtToRedeem = (collateralToRedeem * price) / PRECISION;
+            }
+
+            // Update vault
+            vault.collateral -= collateralToRedeem;
+            vault.debt -= debtToRedeem;
+            vault.timestamp = block.timestamp;
+
+            // If vault debt goes below minimum, close it
+            if (vault.debt > 0 && vault.debt < MIN_DEBT) {
+                // Return remaining collateral to vault owner
+                if (vault.collateral > 0) {
+                    if (!collateralToken.transfer(vault.owner, vault.collateral)) {
+                        revert TransferFailed();
+                    }
+                    totalCollateral -= vault.collateral;
+                }
+
+                // Clear the vault
+                address vaultOwner = vault.owner;
+                delete vaults[vaultId];
+                emit VaultClosed(vaultId, vaultOwner);
+            }
+
+            // Update tracking
+            totalCollateralRedeemed += collateralToRedeem;
+            remainingDebt -= debtToRedeem;
+
+            // Update global state
+            totalCollateral -= collateralToRedeem;
+            totalDebt -= debtToRedeem;
+
+            emit VaultRedeemed(vaultId, debtToRedeem, collateralToRedeem);
+        }
+
+        if (totalCollateralRedeemed == 0) revert InsufficientRedeemableVaults();
+
+        // Calculate redemption fee
+        uint256 fee = (totalCollateralRedeemed * redemptionFee) / PRECISION;
+        uint256 collateralToReceiver = totalCollateralRedeemed - fee;
+
+        // Burn rUSD from caller
+        uint256 actualBurned = rUSDAmount - remainingDebt;
+        stablecoin.burn(msg.sender, actualBurned);
+
+        // Transfer collateral to receiver
+        if (!collateralToken.transfer(receiver, collateralToReceiver)) {
+            revert TransferFailed();
+        }
+
+        // Transfer fee to treasury
+        if (fee > 0) {
+            if (!collateralToken.transfer(address(treasury), fee)) {
+                revert TransferFailed();
+            }
+        }
+
+        emit RedemptionExecuted(msg.sender, receiver, actualBurned, collateralToReceiver, fee);
+
+        return collateralToReceiver;
+    }
+
+    /**
+     * @notice Get estimated collateral amount for a given rUSD redemption
+     * @param rUSDAmount Amount of rUSD to redeem
+     * @return estimatedCollateral Estimated wCTC to receive (after fee)
+     */
+    function getRedeemableAmount(uint256 rUSDAmount)
+        external
+        view
+        returns (uint256 estimatedCollateral)
+    {
+        if (rUSDAmount == 0) return 0;
+
+        uint256 price = oracle.getPrice();
+
+        // Calculate gross collateral at oracle price
+        uint256 grossCollateral = (rUSDAmount * PRECISION) / price;
+
+        // Subtract fee
+        uint256 fee = (grossCollateral * redemptionFee) / PRECISION;
+
+        return grossCollateral - fee;
+    }
+
+    /**
+     * @notice Calculate redemption fee for a given collateral amount
+     * @param collateralAmount Amount of collateral being redeemed
+     * @return fee Fee amount in wCTC
+     */
+    function getRedemptionFee(uint256 collateralAmount)
+        external
+        view
+        returns (uint256 fee)
+    {
+        return (collateralAmount * redemptionFee) / PRECISION;
+    }
+
+    // =============================================================
     //                   LIQUIDATION FUNCTIONS
     // =============================================================
 
@@ -454,6 +619,15 @@ contract VaultManager {
         emit ParametersUpdated(_minCollateralRatio, _borrowingFee);
     }
 
+    /**
+     * @notice Update redemption fee
+     * @param _redemptionFee New redemption fee percentage (e.g., 5e15 = 0.5%)
+     */
+    function setRedemptionFee(uint256 _redemptionFee) external onlyOwner {
+        if (_redemptionFee > 0.1e18) revert InvalidParameters(); // Max 10% fee
+        redemptionFee = _redemptionFee;
+    }
+
     // =============================================================
     //                      INTERNAL HELPERS
     // =============================================================
@@ -470,5 +644,62 @@ contract VaultManager {
         } else {
             return value - uint256(-delta);
         }
+    }
+
+    /**
+     * @notice Get all vaults sorted by health (lowest collateral ratio first)
+     * @dev Uses simple bubble sort - acceptable for MVP, optimize later with sorted list
+     * @return sortedIds Array of vault IDs sorted by collateral ratio (ascending)
+     */
+    function _getSortedVaultsByHealth() private view returns (uint256[] memory sortedIds) {
+        // Count active vaults
+        uint256 activeCount = 0;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            if (vaults[i].owner != address(0) && vaults[i].debt > 0) {
+                activeCount++;
+            }
+        }
+
+        if (activeCount == 0) {
+            return new uint256[](0);
+        }
+
+        // Collect active vault IDs and their ratios
+        sortedIds = new uint256[](activeCount);
+        uint256[] memory ratios = new uint256[](activeCount);
+        uint256 price = oracle.getPrice();
+
+        uint256 index = 0;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage vault = vaults[i];
+            if (vault.owner != address(0) && vault.debt > 0) {
+                sortedIds[index] = i;
+
+                // Calculate collateral ratio
+                uint256 collateralValue = (vault.collateral * price) / PRECISION;
+                ratios[index] = (collateralValue * PRECISION) / vault.debt;
+
+                index++;
+            }
+        }
+
+        // Simple bubble sort (acceptable for MVP)
+        for (uint256 i = 0; i < activeCount; i++) {
+            for (uint256 j = i + 1; j < activeCount; j++) {
+                if (ratios[j] < ratios[i]) {
+                    // Swap ratios
+                    uint256 tempRatio = ratios[i];
+                    ratios[i] = ratios[j];
+                    ratios[j] = tempRatio;
+
+                    // Swap IDs
+                    uint256 tempId = sortedIds[i];
+                    sortedIds[i] = sortedIds[j];
+                    sortedIds[j] = tempId;
+                }
+            }
+        }
+
+        return sortedIds;
     }
 }

@@ -9,6 +9,7 @@ Credit CDP allows users to:
 - Borrow rUSD (stablecoin) against collateral
 - Participate in the Stability Pool to earn liquidation rewards
 - Liquidate under-collateralized vaults
+- Redeem rUSD for wCTC collateral at oracle price
 
 ## Architecture
 
@@ -31,12 +32,13 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 | Minimum Collateral Ratio (MCR) | 130% | Minimum collateral required |
 | Liquidation Penalty | 5% | Bonus for liquidators |
 | Borrowing Fee | 0.5% | Fee on new debt |
+| Redemption Fee | 0.5% | Fee on redeemed collateral |
 | Oracle Staleness Threshold | 1 hour | Max price age |
 
 ## London EVM Compatibility
 
 This protocol is specifically designed for London EVM:
-- Solidity version: 0.8.18
+- Solidity version: 0.8.7
 - EVM version: London
 - No use of post-Merge features (e.g., `block.prevrandao`, transient storage, PUSH0, etc.)
 - Uses `block.difficulty` instead of `prevrandao` for any entropy needs
@@ -83,13 +85,14 @@ forge test --match-test testLiquidation
 forge test --gas-report
 ```
 
-All 15 tests should pass:
+All 25 tests should pass:
 - WCTC wrap/unwrap functionality
 - Oracle price updates and staleness checks
 - Vault operations (open, adjust, close)
 - Collateral ratio calculations
 - Stability pool deposits and withdrawals
 - Liquidations (single and batch)
+- Redemptions (single/multiple vaults, fee calculation, edge cases)
 
 ## Deployment
 
@@ -174,6 +177,22 @@ if (canLiquidate) {
 }
 ```
 
+### Redeeming rUSD for Collateral
+
+```solidity
+// User has 10,000 rUSD and wants to redeem for wCTC
+uint256 redemptionAmount = 10_000e18;
+
+// Check how much wCTC they'll receive
+uint256 estimatedWCTC = vaultManager.getRedeemableAmount(redemptionAmount);
+
+// Approve and redeem
+rusd.approve(address(vaultManager), redemptionAmount);
+uint256 wctcReceived = vaultManager.redeem(redemptionAmount, msg.sender);
+
+// wctcReceived = actual wCTC received (after 0.5% fee)
+```
+
 ## Project Structure
 
 ```
@@ -194,6 +213,7 @@ credit-cdp/
 │   └── Deploy.s.sol             # Deployment script
 ├── foundry.toml                  # Foundry configuration
 ├── ARCHITECTURE.md               # Architecture documentation
+├── REDEMPTION_FEATURE.md         # Redemption mechanism docs
 └── README.md                     # This file
 ```
 

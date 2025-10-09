@@ -118,6 +118,9 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The p
 - `adjustVault(uint256 vaultId, int256 collateralDelta, int256 debtDelta)` - Modify position
 - `closeVault(uint256 vaultId)` - Repay debt and withdraw collateral
 - `getVaultHealth(uint256 vaultId)` - Calculate collateral ratio
+- `redeem(uint256 rUSDAmount, address receiver)` - Redeem rUSD for wCTC from riskiest vaults
+- `getRedeemableAmount(uint256 rUSDAmount)` - Estimate collateral for redemption
+- `getRedemptionFee(uint256 collateralAmount)` - Calculate redemption fee
 
 **Vault Structure**:
 ```solidity
@@ -132,6 +135,7 @@ struct Vault {
 **Parameters**:
 - `MCR` - Minimum Collateral Ratio (e.g., 130% = 1.3e18)
 - `borrowingFee` - Fee on new debt (e.g., 0.5% = 5e15)
+- `redemptionFee` - Fee on redeemed collateral (e.g., 0.5% = 5e15)
 
 **Validation**:
 - Enforce MCR on all operations
@@ -270,6 +274,37 @@ StabilityPool
   └─► 6. Emit StabilityDeposit event
 ```
 
+### Flow 4: Redemption
+
+```
+Redeemer
+  │
+  ├─► 1. Approve rUSD to VaultManager
+  │
+  ├─► 2. Call redeem(amount, receiver)
+  │
+VaultManager
+  │
+  ├─► 3. Sort vaults by collateral ratio (lowest first)
+  │
+  ├─► 4. For each vault (starting with riskiest):
+  │     ├─► Skip if below MCR (liquidatable)
+  │     ├─► Calculate debt to redeem
+  │     ├─► Calculate collateral to return
+  │     ├─► Reduce vault debt and collateral
+  │     └─► Close vault if debt < MIN_DEBT
+  │
+  ├─► 5. Burn rUSD from redeemer
+  │
+  ├─► 6. Apply redemption fee
+  │
+  ├─► 7. Transfer net collateral to receiver
+  │
+  ├─► 8. Transfer fee to Treasury
+  │
+  └─► 9. Emit RedemptionExecuted event
+```
+
 ---
 
 ## Key Parameters
@@ -279,6 +314,7 @@ StabilityPool
 | MCR | 130% (1.3e18) | Minimum collateral ratio |
 | Liquidation Penalty | 5% (5e16) | Bonus for liquidators |
 | Borrowing Fee | 0.5% (5e15) | Fee on new debt (can be 0) |
+| Redemption Fee | 0.5% (5e15) | Fee on redeemed collateral |
 | Oracle Staleness | 1 hour (3600s) | Max price age |
 
 ---
@@ -293,7 +329,7 @@ StabilityPool
 - EIP-4844 blobs
 
 ### What We CAN Use:
-- Solidity 0.8.17 - 0.8.21
+- Solidity 0.8.7 (downgraded from 0.8.18 for maximum London EVM compatibility)
 - EIP-1559 (`block.basefee`)
 - Standard London hardfork features
 - ChainID, standard opcodes
@@ -301,7 +337,7 @@ StabilityPool
 ### Compiler Settings:
 ```toml
 [profile.default]
-solc_version = "0.8.18"
+solc_version = "0.8.7"
 optimizer = true
 optimizer_runs = 200
 evm_version = "london"

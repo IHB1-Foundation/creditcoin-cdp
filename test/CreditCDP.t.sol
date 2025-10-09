@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity 0.8.7;
 
 import "forge-std/Test.sol";
 import "../src/WCTC.sol";
@@ -350,6 +350,253 @@ contract CreditCDPTest is Test {
 
         vm.expectRevert(VaultManager.VaultNotFound.selector);
         vaultManager.getVault(vaultId2);
+    }
+
+    // =============================================================
+    //                    REDEMPTION TESTS
+    // =============================================================
+
+    function testRedemptionSingleVault() public {
+        // Alice opens a vault with low collateral ratio (healthy but close to MCR)
+        // 10 wCTC * $2000 = $20,000, borrowing $14,000 gives ~140% CR
+        uint256 vaultId = _openVaultForAlice(10 ether, 14_000e18);
+
+        // Bob gets rUSD to redeem
+        _openVaultForBob(20 ether, 20_000e18);
+
+        vm.startPrank(bob);
+
+        uint256 bobRUSDBalanceBefore = rusd.balanceOf(bob);
+        uint256 bobWCTCBalanceBefore = wctc.balanceOf(bob);
+
+        // Bob redeems 5000 rUSD
+        uint256 redemptionAmount = 5000e18;
+        rusd.approve(address(vaultManager), redemptionAmount);
+
+        uint256 collateralReceived = vaultManager.redeem(redemptionAmount, bob);
+
+        uint256 bobRUSDBalanceAfter = rusd.balanceOf(bob);
+        uint256 bobWCTCBalanceAfter = wctc.balanceOf(bob);
+
+        // Bob should have burned rUSD
+        assertEq(bobRUSDBalanceBefore - bobRUSDBalanceAfter, redemptionAmount);
+
+        // Bob should have received wCTC (amount depends on price and fee)
+        // At $2000/wCTC: 5000 rUSD = 2.5 wCTC before fee
+        // With 0.5% fee: ~2.4875 wCTC
+        assertTrue(collateralReceived > 2.4 ether && collateralReceived < 2.5 ether);
+        assertEq(bobWCTCBalanceAfter - bobWCTCBalanceBefore, collateralReceived);
+
+        // Alice's vault debt should have decreased
+        VaultManager.Vault memory vault = vaultManager.getVault(vaultId);
+        assertTrue(vault.debt < 14_070e18); // Original debt plus fee
+        assertTrue(vault.collateral < 10 ether);
+
+        vm.stopPrank();
+    }
+
+    function testRedemptionMultipleVaults() public {
+        // Alice opens vault with 140% CR (riskier)
+        uint256 vaultId1 = _openVaultForAlice(10 ether, 14_000e18);
+
+        // Bob opens vault with 160% CR (safer)
+        uint256 vaultId2 = _openVaultForBob(10 ether, 12_000e18);
+
+        // Charlie gets rUSD to redeem
+        vm.startPrank(charlie);
+        wctc.wrap{value: 30 ether}();
+        wctc.approve(address(vaultManager), 30 ether);
+        vaultManager.openVault(30 ether, 30_000e18);
+
+        // Charlie redeems a large amount that requires hitting both vaults
+        uint256 redemptionAmount = 20_000e18;
+        rusd.approve(address(vaultManager), redemptionAmount);
+
+        uint256 collateralReceived = vaultManager.redeem(redemptionAmount, charlie);
+
+        // Should have received collateral
+        assertTrue(collateralReceived > 9.9 ether && collateralReceived < 10.1 ether);
+
+        // Alice's vault (riskier) should be hit first and possibly fully redeemed
+        VaultManager.Vault memory vault1 = vaultManager.getVault(vaultId1);
+        assertTrue(vault1.debt < 14_070e18); // Should be reduced or closed
+
+        // Bob's vault should also be affected
+        VaultManager.Vault memory vault2 = vaultManager.getVault(vaultId2);
+        assertTrue(vault2.debt < 12_060e18); // Should be reduced
+
+        vm.stopPrank();
+    }
+
+    function testRedemptionTargetsLowestCR() public {
+        // Create vaults with different collateral ratios
+        // Alice: 140% CR (riskiest)
+        uint256 vaultId1 = _openVaultForAlice(10 ether, 14_000e18);
+
+        // Bob: 180% CR (safer)
+        uint256 vaultId2 = _openVaultForBob(15 ether, 16_000e18);
+
+        // Record initial debts
+        uint256 aliceDebtBefore = vaultManager.getVault(vaultId1).debt;
+        uint256 bobDebtBefore = vaultManager.getVault(vaultId2).debt;
+
+        // Charlie redeems small amount
+        vm.startPrank(charlie);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        vaultManager.openVault(20 ether, 20_000e18);
+
+        rusd.approve(address(vaultManager), 5000e18);
+        vaultManager.redeem(5000e18, charlie);
+        vm.stopPrank();
+
+        // Alice's vault should be hit (lower CR)
+        uint256 aliceDebtAfter = vaultManager.getVault(vaultId1).debt;
+        assertTrue(aliceDebtAfter < aliceDebtBefore);
+
+        // Bob's vault should be unchanged (higher CR, not targeted)
+        uint256 bobDebtAfter = vaultManager.getVault(vaultId2).debt;
+        assertEq(bobDebtAfter, bobDebtBefore);
+    }
+
+    function testRedemptionFeeCalculation() public {
+        // Alice opens vault
+        _openVaultForAlice(10 ether, 10_000e18);
+
+        // Bob gets rUSD
+        _openVaultForBob(20 ether, 10_000e18);
+
+        vm.startPrank(bob);
+
+        // Check fee calculation
+        uint256 redemptionAmount = 5000e18;
+        uint256 price = oracle.getPrice();
+
+        // Expected collateral before fee
+        uint256 expectedGrossCollateral = (redemptionAmount * PRECISION) / price;
+
+        // Expected fee (0.5% of collateral)
+        uint256 expectedFee = vaultManager.getRedemptionFee(expectedGrossCollateral);
+        assertEq(expectedFee, (expectedGrossCollateral * 5e15) / PRECISION);
+
+        // Estimated net collateral
+        uint256 estimatedCollateral = vaultManager.getRedeemableAmount(redemptionAmount);
+        assertEq(estimatedCollateral, expectedGrossCollateral - expectedFee);
+
+        vm.stopPrank();
+    }
+
+    function testRedemptionSkipsLiquidatableVaults() public {
+        // Alice opens healthy vault (140% CR)
+        uint256 vaultId1 = _openVaultForAlice(10 ether, 14_000e18);
+
+        // Bob opens vault that will become liquidatable
+        uint256 vaultId2 = _openVaultForBob(10 ether, 15_000e18);
+
+        // Charlie opens vault to get rUSD for redemption
+        vm.startPrank(charlie);
+        wctc.wrap{value: 30 ether}();
+        wctc.approve(address(vaultManager), 30 ether);
+        vaultManager.openVault(30 ether, 10_000e18);
+        vm.stopPrank();
+
+        // Price drop makes Bob's vault liquidatable
+        // 10 wCTC * $1200 = $12,000, debt ~$15,075 -> CR = 79% < 130%
+        oracle.setPrice(1200e18, block.timestamp);
+
+        // Verify Bob's vault is liquidatable
+        assertTrue(vaultManager.canLiquidate(vaultId2));
+
+        // Charlie redeems - should skip Bob's vault and hit Alice's
+        vm.startPrank(charlie);
+        rusd.approve(address(vaultManager), 5000e18);
+        uint256 collateralReceived = vaultManager.redeem(5000e18, charlie);
+
+        // Should still receive collateral from Alice's vault
+        assertTrue(collateralReceived > 0);
+
+        vm.stopPrank();
+    }
+
+    function testRedemptionRevertsOnZeroAmount() public {
+        _openVaultForAlice(10 ether, 10_000e18);
+
+        vm.prank(alice);
+        vm.expectRevert(VaultManager.ZeroAmount.selector);
+        vaultManager.redeem(0, alice);
+    }
+
+    function testRedemptionRevertsOnZeroAddress() public {
+        _openVaultForAlice(10 ether, 10_000e18);
+
+        vm.prank(alice);
+        vm.expectRevert(VaultManager.ZeroAddress.selector);
+        vaultManager.redeem(1000e18, address(0));
+    }
+
+    function testRedemptionClosesVaultBelowMinDebt() public {
+        // Alice opens vault with lower CR ~142% (will be targeted first in redemption)
+        // 10 wCTC * $2000 = $20,000, borrowing $14,000 gives ~142% CR
+        uint256 vaultId = _openVaultForAlice(10 ether, 14_000e18);
+
+        // Bob opens much safer vault with higher CR ~400% (won't be targeted)
+        // 100 wCTC * $2000 = $200,000, borrowing $50,000 gives ~400% CR
+        vm.startPrank(bob);
+        wctc.wrap{value: 100 ether}();
+        wctc.approve(address(vaultManager), 100 ether);
+        vaultManager.openVault(100 ether, 50_000e18);
+
+        // Bob redeems almost all of Alice's debt, leaving it below MIN_DEBT (100 rUSD)
+        // Alice's debt is ~$14,070 (including fee), redeeming $14,050 leaves ~$20 which is below MIN_DEBT
+        rusd.approve(address(vaultManager), 14_050e18);
+        vaultManager.redeem(14_050e18, bob);
+
+        vm.stopPrank();
+
+        // Alice's vault should be closed (debt went below MIN_DEBT threshold)
+        vm.expectRevert(VaultManager.VaultNotFound.selector);
+        vaultManager.getVault(vaultId);
+    }
+
+    function testSetRedemptionFee() public {
+        // Owner can update redemption fee
+        uint256 newFee = 10e15; // 1%
+        vaultManager.setRedemptionFee(newFee);
+        assertEq(vaultManager.redemptionFee(), newFee);
+
+        // Non-owner cannot update
+        vm.prank(alice);
+        vm.expectRevert(VaultManager.Unauthorized.selector);
+        vaultManager.setRedemptionFee(5e15);
+
+        // Cannot set fee too high (> 10%)
+        vm.expectRevert(VaultManager.InvalidParameters.selector);
+        vaultManager.setRedemptionFee(0.11e18);
+    }
+
+    function testRedemptionEstimateAccuracy() public {
+        // Open vault
+        _openVaultForAlice(10 ether, 10_000e18);
+
+        // Bob gets rUSD
+        _openVaultForBob(20 ether, 10_000e18);
+
+        vm.startPrank(bob);
+
+        uint256 redemptionAmount = 5000e18;
+
+        // Get estimate
+        uint256 estimatedCollateral = vaultManager.getRedeemableAmount(redemptionAmount);
+
+        // Perform actual redemption
+        rusd.approve(address(vaultManager), redemptionAmount);
+        uint256 actualCollateral = vaultManager.redeem(redemptionAmount, bob);
+
+        // Estimate should match actual (within small rounding error)
+        assertTrue(actualCollateral >= estimatedCollateral);
+        assertTrue(actualCollateral - estimatedCollateral < 0.01 ether); // < 1% difference
+
+        vm.stopPrank();
     }
 
     // =============================================================

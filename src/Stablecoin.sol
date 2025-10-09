@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.18;
+pragma solidity 0.8.7;
 
 /**
  * @title Stablecoin (rUSD)
@@ -11,8 +11,8 @@ contract Stablecoin {
     //                           STORAGE
     // =============================================================
 
-    string public constant name = "Reserve USD";
-    string public constant symbol = "rUSD";
+    string public constant name = "CreditCoin USD";
+    string public constant symbol = "crdUSD";
     uint8 public constant decimals = 18;
 
     mapping(address => uint256) public balanceOf;
