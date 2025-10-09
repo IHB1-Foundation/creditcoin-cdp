@@ -6,6 +6,7 @@ import { shortenAddress } from '@/lib/utils';
 import { useTokenBalances } from '@/hooks/useTokens';
 import { useInterestStats, useUserVaults } from '@/hooks/useVault';
 import { useReadContract } from 'wagmi';
+import { useEffect, useState } from 'react';
 import { CONTRACTS } from '@/lib/config';
 import { VaultManagerABI } from '@/lib/abis/VaultManager';
 import { Tooltip } from './ui/Tooltip';
@@ -19,9 +20,17 @@ export function Header() {
   const { minRate, weightedAvgRate, maxRate } = useInterestStats();
   const { vaultIds } = useUserVaults();
 
-  // Read currently selected vault id from localStorage and fetch its interest
-  const selectedVaultIdStr = typeof window !== 'undefined' ? window.localStorage.getItem('selectedVaultId') : null;
-  const selectedVaultId = selectedVaultIdStr ? (BigInt(selectedVaultIdStr) as unknown as bigint) : undefined;
+  // Read currently selected vault id from localStorage client-side only
+  const [selectedVaultId, setSelectedVaultId] = useState<bigint | undefined>(undefined);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const stored = window.localStorage.getItem('selectedVaultId');
+    if (stored) {
+      try {
+        setSelectedVaultId(BigInt(stored));
+      } catch {}
+    }
+  }, [vaultIds?.length]);
   const { data: currentVaultInterest } = useReadContract({
     address: CONTRACTS.VAULT_MANAGER,
     abi: VaultManagerABI,

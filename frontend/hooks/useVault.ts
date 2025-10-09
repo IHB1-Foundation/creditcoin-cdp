@@ -50,7 +50,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     functionName: 'getVaultCollateralRatio',
     args: vaultId !== undefined ? [vaultId] : undefined,
     query: {
-      enabled: vaultId !== undefined && vault !== undefined,
+      enabled: vaultId !== undefined && vaultBasic !== undefined,
     },
   });
 
@@ -60,7 +60,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     functionName: 'canLiquidate',
     args: vaultId !== undefined ? [vaultId] : undefined,
     query: {
-      enabled: vaultId !== undefined && vault !== undefined,
+      enabled: vaultId !== undefined && vaultBasic !== undefined,
     },
   });
 

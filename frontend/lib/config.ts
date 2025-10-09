@@ -4,7 +4,6 @@ import { Chain } from 'viem';
 export const creditcoinTestnet: Chain = {
   id: parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '5555'),
   name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'CreditCoin Testnet',
-  network: 'creditcoin-testnet',
   nativeCurrency: {
     decimals: 18,
     name: 'tCTC',

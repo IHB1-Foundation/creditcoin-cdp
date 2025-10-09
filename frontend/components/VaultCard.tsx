@@ -36,13 +36,6 @@ export function VaultCard() {
   const [interestRate, setInterestRate] = useState('5'); // percent
   const [newInterest, setNewInterest] = useState('');
 
-  useEffect(() => {
-    if (vaultInterest !== undefined) {
-      const percent = Number((vaultInterest * BigInt(10000)) / BigInt(1e18)) / 100;
-      setNewInterest(percent.toString());
-    }
-  }, [vaultInterest]);
-
   // Persist and restore selected vault id via localStorage for cross-component visibility (Header)
   useEffect(() => {
     if (!vaultIds || vaultIds.length === 0) return;
@@ -56,6 +49,14 @@ export function VaultCard() {
 
   const vaultId = vaultIds?.[selectedVaultIndex];
   const { vault, collateralRatio, interestRate: vaultInterest, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(vaultId);
+
+  // Sync newInterest field with on-chain interest when it changes
+  useEffect(() => {
+    if (vaultInterest !== undefined) {
+      const percent = Number((vaultInterest * BigInt(10000)) / BigInt(1e18)) / 100;
+      setNewInterest(percent.toString());
+    }
+  }, [vaultInterest]);
   const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { wctcAllowance, rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
 
@@ -149,9 +150,9 @@ export function VaultCard() {
 
     try {
       const collatDelta = parseToBigInt(collateralDelta);
-      const debtDelta = parseToBigInt(debtDelta);
+      const debtDeltaBI = parseToBigInt(debtDelta);
 
-      if (collatDelta === BigInt(0) && debtDelta === BigInt(0)) {
+      if (collatDelta === BigInt(0) && debtDeltaBI === BigInt(0)) {
         toast.error('Please enter an amount to adjust');
         return;
       }
@@ -165,16 +166,16 @@ export function VaultCard() {
         }
       }
 
-      if (!isBorrow && debtDelta > BigInt(0)) {
-        if (rusdAllowance === undefined || rusdAllowance < debtDelta) {
+      if (!isBorrow && debtDeltaBI > BigInt(0)) {
+        if (rusdAllowance === undefined || rusdAllowance < debtDeltaBI) {
           toast('Approving crdUSD...', { icon: '⏳' });
-          await approve('rusd', CONTRACTS.VAULT_MANAGER, debtDelta * BigInt(2));
+          await approve('rusd', CONTRACTS.VAULT_MANAGER, debtDeltaBI * BigInt(2));
           return;
         }
       }
 
       const finalCollatDelta = isDeposit ? collatDelta : -collatDelta;
-      const finalDebtDelta = isBorrow ? debtDelta : -debtDelta;
+      const finalDebtDelta = isBorrow ? debtDeltaBI : -debtDeltaBI;
 
       await adjustVault(vaultId, finalCollatDelta, finalDebtDelta);
     } catch (error) {
