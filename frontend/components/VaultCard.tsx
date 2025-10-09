@@ -418,6 +418,19 @@ export function VaultCard() {
           <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
           <span className="text-xs text-gray-500">0 - 40</span>
         </div>
+        {/* Quick-select presets */}
+        <div className="mb-2 flex gap-2">
+          {["5", "10", "15", "20"].map((p) => (
+            <button
+              key={p}
+              type="button"
+              className={`px-2 py-1 text-xs rounded border ${interestRate === p ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-700'}`}
+              onClick={() => setInterestRate(p)}
+            >
+              {p}%
+            </button>
+          ))}
+        </div>
         <Input
           type="number"
           placeholder="5.0"
@@ -604,6 +617,19 @@ export function VaultCard() {
           <div className="flex items-center justify-between mb-1">
             <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
             <span className="text-xs text-gray-500">0 - 40</span>
+          </div>
+          {/* Quick-select presets */}
+          <div className="mb-2 flex gap-2">
+            {["5", "10", "15", "20"].map((p) => (
+              <button
+                key={p}
+                type="button"
+                className={`px-2 py-1 text-xs rounded border ${newInterest === p ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-700'}`}
+                onClick={() => setNewInterest(p)}
+              >
+                {p}%
+              </button>
+            ))}
           </div>
           <Input
             type="number"
