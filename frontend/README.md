@@ -150,21 +150,13 @@ frontend/
 
 Click "Connect Wallet" in the header to connect MetaMask to CreditCoin Testnet.
 
-### 2. Wrap tCTC to wCTC
-
-Before opening a vault, you need wCTC collateral:
-1. In the Vault Card, click "Wrap tCTC"
-2. Enter the amount of native tCTC to wrap
-3. Confirm the transaction
-
-### 3. Open a Vault
+### 2. Open a Vault
 
 1. Navigate to the "Open Vault" tab
-2. Enter collateral amount (wCTC)
+2. Enter collateral amount (tCTC – native token)
 3. Enter debt amount (crdUSD to borrow)
 4. Click "Open Vault"
-5. Approve wCTC if needed (first time)
-6. Confirm the transaction
+5. Confirm the transaction
 
 ### 4. Adjust Your Vault
 
@@ -183,11 +175,11 @@ Before opening a vault, you need wCTC collateral:
 5. Approve crdUSD if needed
 6. Claim wCTC gains when available
 
-### 6. Redeem crdUSD for wCTC
+### 5. Redeem crdUSD for tCTC
 
 1. Navigate to the Redemption card
 2. Enter crdUSD amount to redeem
-3. Review the estimated wCTC you'll receive
+3. Review the estimated tCTC you'll receive
 4. Click "Redeem"
 5. Approve crdUSD if needed
 6. Confirm the transaction
@@ -197,13 +189,13 @@ Before opening a vault, you need wCTC collateral:
 ### Vault Management
 
 - **Health Factor**: Shows your collateral ratio (green = safe, yellow = at risk, red = liquidatable)
-- **Liquidation Price**: The wCTC price at which your vault becomes liquidatable
+- **Liquidation Price**: The tCTC price at which your vault becomes liquidatable
 - **Minimum Debt**: 100 crdUSD minimum to open/maintain a vault
 - **Interest Rate**: Borrower-chosen, 0–40% APR (two decimals supported)
 
 ### Stability Pool
 
-- **Rewards**: Earn wCTC collateral from liquidated vaults
+- **Rewards**: Earn collateral from liquidated vaults
 - **Pool Share**: Your percentage of the total stability pool
 - **Claim Anytime**: Withdraw your collateral gains whenever you want
 

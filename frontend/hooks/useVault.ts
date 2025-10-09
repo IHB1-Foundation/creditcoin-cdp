@@ -96,11 +96,13 @@ export function useOpenVault() {
 
   const openVault = async (collateralAmount: bigint, debtAmount: bigint, interestRate: bigint) => {
     try {
+      // Use native path: collateralAmount is sent as msg.value
       await writeContract({
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
-        functionName: 'openVault',
-        args: [collateralAmount, debtAmount, interestRate],
+        functionName: 'openVaultNative',
+        args: [debtAmount, interestRate],
+        value: collateralAmount,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -129,12 +131,31 @@ export function useAdjustVault() {
 
   const adjustVault = async (vaultId: bigint, collateralDelta: bigint, debtDelta: bigint) => {
     try {
-      await writeContract({
-        address: CONTRACTS.VAULT_MANAGER,
-        abi: VaultManagerABI,
-        functionName: 'adjustVault',
-        args: [vaultId, collateralDelta, debtDelta],
-      });
+      // Native first for collateral if positive, then handle debt change
+      if (collateralDelta > 0n) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'depositCollateralNative',
+          args: [vaultId],
+          value: collateralDelta,
+        });
+      } else if (collateralDelta < 0n) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'withdrawCollateralNative',
+          args: [vaultId, BigInt(-collateralDelta)],
+        });
+      }
+      if (debtDelta !== 0n) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'adjustVault',
+          args: [vaultId, 0n, debtDelta],
+        });
+      }
     } catch (err: any) {
       toast.error(formatError(err));
       throw err;
@@ -165,7 +186,7 @@ export function useCloseVault() {
       await writeContract({
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
-        functionName: 'closeVault',
+        functionName: 'closeVaultNative',
         args: [vaultId],
       });
     } catch (err: any) {

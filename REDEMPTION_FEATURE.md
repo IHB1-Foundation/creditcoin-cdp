@@ -170,10 +170,10 @@ uint256 redemptionAmount = 10_000e18;
 // Approve VaultManager to burn crdUSD
 rusd.approve(address(vaultManager), redemptionAmount);
 
-// Perform redemption
-uint256 collateralReceived = vaultManager.redeem(
+// Perform redemption to native tCTC
+uint256 collateralReceived = vaultManager.redeemNative(
     redemptionAmount,
-    msg.sender // Receive wCTC in same address
+    msg.sender // Receive native in same address
 );
 
 // collateralReceived = amount of wCTC received (after fee)
@@ -201,11 +201,11 @@ if (estimatedWCTC >= minAcceptableAmount) {
 ### Separate Receiver
 
 ```solidity
-// Redeem to a different address (e.g., cold wallet)
+// Redeem native to a different address (e.g., cold wallet)
 address coldWallet = 0x...;
 
 rusd.approve(address(vaultManager), redemptionAmount);
-vaultManager.redeem(redemptionAmount, coldWallet);
+vaultManager.redeemNative(redemptionAmount, coldWallet);
 ```
 
 ## Test Coverage

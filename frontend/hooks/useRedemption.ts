@@ -70,28 +70,13 @@ export function useRedeem() {
     preferLargerDebt?: boolean,
   ) => {
     try {
-      if (maxInterestRate !== undefined && preferLargerDebt !== undefined) {
-        await writeContract({
-          address: CONTRACTS.VAULT_MANAGER,
-          abi: VaultManagerABI,
-          functionName: 'redeemAdvanced',
-          args: [rUSDAmount, receiver, maxInterestRate, preferLargerDebt],
-        });
-      } else if (maxInterestRate !== undefined) {
-        await writeContract({
-          address: CONTRACTS.VAULT_MANAGER,
-          abi: VaultManagerABI,
-          functionName: 'redeemWithCap',
-          args: [rUSDAmount, receiver, maxInterestRate],
-        });
-      } else {
-        await writeContract({
-          address: CONTRACTS.VAULT_MANAGER,
-          abi: VaultManagerABI,
-          functionName: 'redeem',
-          args: [rUSDAmount, receiver],
-        });
-      }
+      // Always redeem to native tCTC for receiver
+      await writeContract({
+        address: CONTRACTS.VAULT_MANAGER,
+        abi: VaultManagerABI,
+        functionName: 'redeemNative',
+        args: [rUSDAmount, receiver],
+      });
     } catch (err: any) {
       toast.error(formatError(err));
       throw err;

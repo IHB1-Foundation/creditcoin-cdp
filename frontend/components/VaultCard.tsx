@@ -58,7 +58,7 @@ export function VaultCard() {
     }
   }, [vaultInterest]);
   const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
-  const { wctcAllowance, rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
+  const { rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
 
   const { openVault, isPending: isOpening, isSuccess: openSuccess } = useOpenVault();
   const { adjustVault, isPending: isAdjusting, isSuccess: adjustSuccess } = useAdjustVault();
@@ -113,13 +113,6 @@ export function VaultCard() {
 
       if (debt < PROTOCOL_PARAMS.MIN_DEBT) {
         toast.error(`Minimum debt is ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT)} crdUSD`);
-        return;
-      }
-
-      // Check if approval needed
-      if (wctcAllowance === undefined || wctcAllowance < collateral) {
-        toast('Approving wCTC...', { icon: '⏳' });
-        await approve('wctc', CONTRACTS.VAULT_MANAGER, collateral * BigInt(2));
         return;
       }
 
@@ -189,33 +182,12 @@ export function VaultCard() {
     if (!vaultId || !vault) return;
 
     try {
-      // Check crdUSD approval
-      if (rusdAllowance === undefined || rusdAllowance < vault.debt) {
-        toast('Approving crdUSD...', { icon: '⏳' });
-        await approve('rusd', CONTRACTS.VAULT_MANAGER, vault.debt * BigInt(2));
-        return;
-      }
-
       await closeVault(vaultId);
     } catch (error) {
       // Error handling in hook
     }
   };
 
-  const handleWrap = async () => {
-    try {
-      const amount = parseToBigInt(collateralAmount);
-      if (amount === BigInt(0)) {
-        toast.error('Please enter an amount to wrap');
-        return;
-      }
-
-      await wrap(amount);
-      toast.success('tCTC wrapped successfully!');
-    } catch (error) {
-      // Error handling in hook
-    }
-  };
 
   if (!isConnected) {
     return (
@@ -385,25 +357,11 @@ export function VaultCard() {
         <div className="space-y-3">
           <Input
             type="number"
-            label="Collateral Amount (wCTC)"
+            label="Collateral Amount (tCTC)"
             placeholder="0.0"
             value={collateralAmount}
             onChange={(e) => setCollateralAmount(e.target.value)}
-            rightElement={
-              <button
-                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-                onClick={() => wctcBalance && setCollateralAmount(formatBigInt(wctcBalance, 18, 18))}
-              >
-                MAX
-              </button>
-            }
           />
-          <div className="flex items-center justify-between text-xs">
-            <span className="text-gray-500">Available: <span className="font-medium text-gray-700">{wctcBalance ? formatBigInt(wctcBalance) : '--'}</span> wCTC</span>
-            <Button size="sm" variant="secondary" onClick={handleWrap} isLoading={isWrapping}>
-              Wrap tCTC
-            </Button>
-          </div>
 
       <Input
         type="number"
@@ -437,7 +395,7 @@ export function VaultCard() {
           value={interestRate}
           onChange={(e) => setInterestRate(e.target.value)}
         />
-        <p className="mt-1 text-xs text-gray-500">You can adjust this later. Redemptions target lowest interest first.</p>
+        <p className="mt-1 text-xs text-gray-500">You can adjust this later. Redemptions target lowest APR first.</p>
       </div>
 
           {/* Projected health preview */}
@@ -573,7 +531,7 @@ export function VaultCard() {
         <div className="space-y-4">
           <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl">
             <p className="text-sm text-warning font-medium">
-              Closing this vault will repay all debt ({formatBigInt(vault.debt, 18, 2)} crdUSD) and return all collateral ({formatBigInt(vault.collateral)} wCTC).
+              Closing this vault will repay all debt ({formatBigInt(vault.debt, 18, 2)} crdUSD) and return all collateral ({formatBigInt(vault.collateral)} tCTC).
             </p>
         </div>
 
@@ -587,8 +545,8 @@ export function VaultCard() {
               <span className="font-semibold">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'} crdUSD</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">wCTC to receive:</span>
-              <span className="font-semibold text-success">{formatBigInt(vault.collateral)} wCTC</span>
+              <span className="text-gray-600">tCTC to receive:</span>
+              <span className="font-semibold text-success">{formatBigInt(vault.collateral)} tCTC</span>
             </div>
           </div>
 

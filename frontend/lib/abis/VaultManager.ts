@@ -12,6 +12,16 @@ export const VaultManagerABI = [
   },
   {
     type: 'function',
+    name: 'openVaultNative',
+    inputs: [
+      { name: 'debtAmount', type: 'uint256' },
+      { name: 'interestRate', type: 'uint256' },
+    ],
+    outputs: [{ name: 'vaultId', type: 'uint256' }],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
     name: 'openVault',
     inputs: [
       { name: 'collateralAmount', type: 'uint256' },
@@ -33,7 +43,33 @@ export const VaultManagerABI = [
   },
   {
     type: 'function',
+    name: 'depositCollateralNative',
+    inputs: [
+      { name: 'vaultId', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'payable',
+  },
+  {
+    type: 'function',
+    name: 'withdrawCollateralNative',
+    inputs: [
+      { name: 'vaultId', type: 'uint256' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
     name: 'closeVault',
+    inputs: [{ name: 'vaultId', type: 'uint256' }],
+    outputs: [],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'closeVaultNative',
     inputs: [{ name: 'vaultId', type: 'uint256' }],
     outputs: [],
     stateMutability: 'nonpayable',
@@ -46,6 +82,16 @@ export const VaultManagerABI = [
       { name: 'receiver', type: 'address' },
     ],
     outputs: [{ name: 'collateralRedeemed', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'redeemNative',
+    inputs: [
+      { name: 'rUSDAmount', type: 'uint256' },
+      { name: 'receiver', type: 'address' },
+    ],
+    outputs: [{ name: 'collateralRedeemedNative', type: 'uint256' }],
     stateMutability: 'nonpayable',
   },
   {

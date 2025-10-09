@@ -17,7 +17,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 
 ### Core Components
 
-- **WCTC**: Wrapped tCTC token for use as collateral
+- **WCTC**: Wrapped tCTC token for internal accounting (frontend zaps native)
 - **Stablecoin (crdUSD)**: Protocol-controlled stablecoin
 - **VaultManager**: Core CDP logic for managing collateralized positions
   - Borrowers choose a per-vault interest rate (0–40%, two decimals supported)
@@ -214,11 +214,10 @@ uint256 redemptionAmount = 10_000e18;
 // Check how much wCTC they'll receive
 uint256 estimatedWCTC = vaultManager.getRedeemableAmount(redemptionAmount);
 
-// Approve and redeem
-stablecoin.approve(address(vaultManager), redemptionAmount);
-uint256 wctcReceived = vaultManager.redeem(redemptionAmount, msg.sender);
+// Redeem native directly
+uint256 nativeReceived = vaultManager.redeemNative(redemptionAmount, msg.sender);
 
-// wctcReceived = actual wCTC received (after 0.5% fee)
+// nativeReceived = actual tCTC received (after fee)
 
 // Advanced: Redeem with APR cap (skip vaults above 3% APR)
 uint256 wctcReceivedCapped = vaultManager.redeemWithCap(5_000e18, msg.sender, 0.03e18);

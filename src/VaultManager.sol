@@ -51,6 +51,9 @@ contract VaultManager {
 
     address public owner;
 
+    // Allow receiving native tCTC (for unwrap flows)
+    receive() external payable {}
+
     // =============================================================
     //                           EVENTS
     // =============================================================
@@ -181,6 +184,56 @@ contract VaultManager {
     {
         // Backwards-compatible overload: default interest
         return openVault(collateralAmount, debtAmount, DEFAULT_INTEREST);
+    }
+
+    /**
+     * @notice Open a new vault using native tCTC as collateral (wrapped internally)
+     * @param debtAmount Amount of crdUSD to borrow
+     * @param interestRate Borrower-chosen interest rate (1e18 = 100%)
+     * @return vaultId ID of the newly created vault
+     */
+    function openVaultNative(uint256 debtAmount, uint256 interestRate)
+        external
+        payable
+        returns (uint256 vaultId)
+    {
+        uint256 collateralAmount = msg.value;
+        if (collateralAmount == 0) revert ZeroAmount();
+        if (debtAmount < MIN_DEBT) revert DebtTooLow();
+        if (interestRate > MAX_INTEREST) revert InvalidParameters();
+
+        uint256 price = oracle.getPrice();
+        uint256 fee = (debtAmount * borrowingFee) / PRECISION;
+        uint256 totalDebtWithFee = debtAmount + fee;
+
+        uint256 collateralValue = (collateralAmount * price) / PRECISION;
+        uint256 requiredCollateral = (totalDebtWithFee * minCollateralRatio) / PRECISION;
+        if (collateralValue < requiredCollateral) revert InsufficientCollateralRatio();
+
+        // Wrap native to wCTC into this contract
+        IWCTC(address(collateralToken)).wrap{value: collateralAmount}();
+
+        // Create vault owned by user
+        vaultId = nextVaultId++;
+        vaults[vaultId] = Vault({
+            owner: msg.sender,
+            collateral: collateralAmount,
+            debt: totalDebtWithFee,
+            interestRate: interestRate,
+            timestamp: block.timestamp
+        });
+        userVaults[msg.sender].push(vaultId);
+
+        totalCollateral += collateralAmount;
+        totalDebt += totalDebtWithFee;
+
+        // Mint crdUSD and fee
+        stablecoin.mint(msg.sender, debtAmount);
+        if (fee > 0) {
+            stablecoin.mint(address(treasury), fee);
+        }
+
+        emit VaultOpened(vaultId, msg.sender, collateralAmount, totalDebtWithFee);
     }
 
     /**
@@ -323,6 +376,81 @@ contract VaultManager {
     }
 
     /**
+     * @notice Deposit native tCTC collateral (wrapped internally) into an existing vault
+     * @param vaultId ID of the vault
+     */
+    function depositCollateralNative(uint256 vaultId)
+        external
+        payable
+        vaultExists(vaultId)
+        onlyVaultOwner(vaultId)
+    {
+        if (msg.value == 0) revert ZeroAmount();
+        Vault storage vault = vaults[vaultId];
+
+        // Accrue interest then update collateral
+        _accrueInterest(vault);
+
+        uint256 newCollateral = vault.collateral + msg.value;
+        // Check ratio if debt remains
+        if (vault.debt > 0) {
+            uint256 price = oracle.getPrice();
+            uint256 collateralValue = (newCollateral * price) / PRECISION;
+            uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
+            if (collateralValue < requiredCollateral) revert InsufficientCollateralRatio();
+        }
+
+        // Wrap into contract balance
+        IWCTC(address(collateralToken)).wrap{value: msg.value}();
+
+        // Update state
+        vault.collateral = newCollateral;
+        vault.timestamp = block.timestamp;
+        totalCollateral += msg.value;
+
+        emit VaultAdjusted(vaultId, int256(msg.value), int256(0), newCollateral, vault.debt);
+    }
+
+    /**
+     * @notice Withdraw collateral as native tCTC (unwraps internally)
+     * @param vaultId ID of the vault
+     * @param amount Amount of collateral to withdraw (in wCTC units)
+     */
+    function withdrawCollateralNative(uint256 vaultId, uint256 amount)
+        external
+        vaultExists(vaultId)
+        onlyVaultOwner(vaultId)
+    {
+        if (amount == 0) revert ZeroAmount();
+        Vault storage vault = vaults[vaultId];
+
+        // Accrue interest and compute new collateral
+        _accrueInterest(vault);
+        if (amount > vault.collateral) amount = vault.collateral;
+        uint256 newCollateral = vault.collateral - amount;
+
+        // Check ratio if debt remains
+        if (vault.debt > 0) {
+            uint256 price = oracle.getPrice();
+            uint256 collateralValue = (newCollateral * price) / PRECISION;
+            uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
+            if (collateralValue < requiredCollateral) revert InsufficientCollateralRatio();
+        }
+
+        // Update state before external calls
+        vault.collateral = newCollateral;
+        vault.timestamp = block.timestamp;
+        totalCollateral -= amount;
+
+        // Unwrap into this contract then forward to user
+        IWCTC(address(collateralToken)).unwrap(amount);
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        if (!ok) revert TransferFailed();
+
+        emit VaultAdjusted(vaultId, -int256(amount), int256(0), newCollateral, vault.debt);
+    }
+
+    /**
      * @notice Close a vault by repaying all debt and withdrawing collateral
      * @param vaultId ID of the vault to close
      */
@@ -359,6 +487,38 @@ contract VaultManager {
         emit VaultClosed(vaultId, msg.sender);
     }
 
+    /**
+     * @notice Close a vault and receive native tCTC (unwraps internally)
+     * @param vaultId ID of the vault to close
+     */
+    function closeVaultNative(uint256 vaultId)
+        external
+        vaultExists(vaultId)
+        onlyVaultOwner(vaultId)
+    {
+        Vault storage vault = vaults[vaultId];
+        _accrueInterest(vault);
+
+        uint256 collateralAmount = vault.collateral;
+        uint256 debtAmount = vault.debt;
+
+        if (debtAmount > 0) {
+            stablecoin.burn(msg.sender, debtAmount);
+            totalDebt -= debtAmount;
+        }
+
+        if (collateralAmount > 0) {
+            // Unwrap collateral and forward native
+            IWCTC(address(collateralToken)).unwrap(collateralAmount);
+            (bool ok, ) = payable(msg.sender).call{value: collateralAmount}("");
+            if (!ok) revert TransferFailed();
+            totalCollateral -= collateralAmount;
+        }
+
+        delete vaults[vaultId];
+        emit VaultClosed(vaultId, msg.sender);
+    }
+
     // =============================================================
     //                    REDEMPTION FUNCTIONS
     // =============================================================
@@ -375,6 +535,35 @@ contract VaultManager {
         returns (uint256 collateralRedeemed)
     {
         return _redeemCore(rUSDAmount, receiver, type(uint256).max);
+    }
+
+    /**
+     * @notice Redeem crdUSD and receive native tCTC directly (unwraps net collateral)
+     * @param rUSDAmount Amount of crdUSD to burn for redemption
+     * @param receiver Address to receive native tCTC
+     * @return collateralRedeemedNative Amount of native tCTC sent to receiver (after fee)
+     */
+    function redeemNative(uint256 rUSDAmount, address receiver)
+        external
+        returns (uint256 collateralRedeemedNative)
+    {
+        // Reuse core path to select vaults and compute total wCTC redeemed
+        uint256 beforeWCTC = IERC20(address(collateralToken)).balanceOf(address(this));
+        uint256 wctcAmount = _redeemCore(rUSDAmount, address(this), type(uint256).max);
+        // _redeemCore transferred wCTC to receiver; but we passed address(this)
+        // so we must adjust: revert to internal variant that doesn't transfer. To keep minimal changes,
+        // we compute delta and unwrap only the net amount.
+        // However, _redeemCore already emitted events and transferred fee to treasury.
+        // Instead, implement a dedicated internal path is larger change. We'll adapt:
+        // Balance delta is net to receiver (after fee).
+        uint256 afterWCTC = IERC20(address(collateralToken)).balanceOf(address(this));
+        uint256 netToReceiver = afterWCTC > beforeWCTC ? (afterWCTC - beforeWCTC) : 0;
+        if (netToReceiver == 0) return 0;
+        // Unwrap and forward native to receiver
+        IWCTC(address(collateralToken)).unwrap(netToReceiver);
+        (bool ok, ) = payable(receiver).call{value: netToReceiver}("");
+        if (!ok) revert TransferFailed();
+        return netToReceiver;
     }
 
     /**

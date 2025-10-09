@@ -86,7 +86,7 @@ export function RedemptionCard() {
   }
 
   return (
-    <Card title="Redemption" subtitle="Burn crdUSD to receive wCTC collateral">
+    <Card title="Redemption" subtitle="Burn crdUSD to receive native tCTC collateral">
       {/* Amount */}
       <div className="space-y-3">
         <Input
@@ -117,14 +117,14 @@ export function RedemptionCard() {
             <div className="flex justify-between items-center">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Collateral</span>
               <span className="font-semibold text-gray-900">
-                {grossCollateral ? formatBigInt(grossCollateral, 18, 4) : '--'} wCTC
+                {grossCollateral ? formatBigInt(grossCollateral, 18, 4) : '--'} tCTC
               </span>
             </div>
 
             <div className="flex justify-between items-center">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Redemption Fee {redemptionFeeRate ? `(${formatPercentage(redemptionFeeRate)})` : ''}</span>
               <span className="text-sm text-error font-medium">
-                - {feeAmount ? formatBigInt(feeAmount, 18, 4) : '--'} wCTC
+                - {feeAmount ? formatBigInt(feeAmount, 18, 4) : '--'} tCTC
               </span>
             </div>
 
@@ -132,8 +132,8 @@ export function RedemptionCard() {
               <span className="text-sm font-medium text-gray-700">You Will Receive</span>
               <div className="text-right">
                 <p className="font-semibold text-lg text-success">
-                  {formatBigInt(estimatedCollateral, 18, 4)} wCTC
-                </p>
+                  {formatBigInt(estimatedCollateral, 18, 4)} tCTC
+              </p>
                 {price && (
                   <p className="text-xs text-gray-500">
                     ≈ {formatUSD((estimatedCollateral * price) / BigInt(1e18))}
@@ -192,7 +192,7 @@ export function RedemptionCard() {
       <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-xl">
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How redemptions work</p>
         <ul className="text-sm text-primary-800 space-y-1">
-          <li>• Burn your crdUSD to receive wCTC at oracle price</li>
+          <li>• Burn your crdUSD to receive native tCTC at oracle price</li>
           <li>• Protocol targets lowest-APR vaults first (prefers larger loans on ties)</li>
           <li>• Great arbitrage when crdUSD trades below $1</li>
           <li>• Helps maintain the crdUSD peg</li>

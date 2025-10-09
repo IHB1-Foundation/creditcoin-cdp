@@ -35,3 +35,8 @@ interface IStabilityPool {
     function absorbDebt(uint256 debtAmount, uint256 collateralAmount) external;
     function canAbsorbDebt(uint256 debtAmount) external view returns (bool);
 }
+
+interface IWCTC {
+    function wrap() external payable;
+    function unwrap(uint256 amount) external;
+}
