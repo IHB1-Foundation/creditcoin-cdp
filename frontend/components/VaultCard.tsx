@@ -33,7 +33,7 @@ export function VaultCard() {
   const [debtDelta, setDebtDelta] = useState('');
   const [isDeposit, setIsDeposit] = useState(true);
   const [isBorrow, setIsBorrow] = useState(true);
-  const [interestRate, setInterestRate] = useState('5'); // percent
+  const [interestRate, setInterestRate] = useState('5'); // percent (two decimals supported)
   const [newInterest, setNewInterest] = useState('');
 
   // Persist and restore selected vault id via localStorage for cross-component visibility (Header)
@@ -124,11 +124,13 @@ export function VaultCard() {
       }
 
       // interestRate is a percent string, convert to 1e18
-      const rateNum = Number(interestRate);
-      if (isNaN(rateNum) || rateNum < 0 || rateNum > 10) {
-        toast.error('Interest rate must be between 0% and 10%');
+      let rateNum = Number(interestRate);
+      if (isNaN(rateNum) || rateNum < 0 || rateNum > 40) {
+        toast.error('Interest rate must be between 0% and 40%');
         return;
       }
+      // Round to two decimals (2-fixed points support)
+      rateNum = Math.round(rateNum * 100) / 100;
       const rateWad = parseToBigInt((rateNum / 100).toString());
       await openVault(collateral, debt, rateWad);
     } catch (error) {
@@ -414,7 +416,7 @@ export function VaultCard() {
       <div>
         <div className="flex items-center justify-between mb-1">
           <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
-          <span className="text-xs text-gray-500">0 - 10</span>
+          <span className="text-xs text-gray-500">0 - 40</span>
         </div>
         <Input
           type="number"
@@ -601,7 +603,7 @@ export function VaultCard() {
         <div className="mt-4">
           <div className="flex items-center justify-between mb-1">
             <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
-            <span className="text-xs text-gray-500">0 - 10</span>
+            <span className="text-xs text-gray-500">0 - 40</span>
           </div>
           <Input
             type="number"
@@ -614,11 +616,13 @@ export function VaultCard() {
             variant="secondary"
             onClick={async () => {
               if (!vaultId) return;
-              const rateNum = Number(newInterest);
-              if (isNaN(rateNum) || rateNum < 0 || rateNum > 10) {
-                toast.error('Interest rate must be between 0% and 10%');
+              let rateNum = Number(newInterest);
+              if (isNaN(rateNum) || rateNum < 0 || rateNum > 40) {
+                toast.error('Interest rate must be between 0% and 40%');
                 return;
               }
+              // Round to two decimals
+              rateNum = Math.round(rateNum * 100) / 100;
               const rateWad = parseToBigInt((rateNum / 100).toString());
               await updateInterest(vaultId, rateWad);
               toast.success('Interest updated');

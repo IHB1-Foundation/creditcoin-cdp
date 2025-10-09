@@ -199,6 +199,7 @@ Before opening a vault, you need wCTC collateral:
 - **Health Factor**: Shows your collateral ratio (green = safe, yellow = at risk, red = liquidatable)
 - **Liquidation Price**: The wCTC price at which your vault becomes liquidatable
 - **Minimum Debt**: 100 crdUSD minimum to open/maintain a vault
+- **Interest Rate**: Borrower-chosen, 0–40% APR (two decimals supported)
 
 ### Stability Pool
 

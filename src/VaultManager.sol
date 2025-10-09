@@ -24,7 +24,7 @@ contract VaultManager {
     // Constants with 18 decimals precision
     uint256 private constant PRECISION = 1e18;
     uint256 private constant MIN_DEBT = 100e18; // Minimum 100 crdUSD debt
-    uint256 private constant MAX_INTEREST = 0.1e18; // Max 10% interest
+    uint256 private constant MAX_INTEREST = 0.40e18; // Max 40% interest
     uint256 private constant DEFAULT_INTEREST = 5e16; // 5%
     uint256 private constant SECONDS_PER_YEAR = 365 days;
 
