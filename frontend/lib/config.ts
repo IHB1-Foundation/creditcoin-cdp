@@ -2,7 +2,7 @@ import { Chain } from 'viem';
 
 // CreditCoin Testnet Chain Configuration
 export const creditcoinTestnet: Chain = {
-  id: parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '5555'),
+  id: parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '102031'),
   name: process.env.NEXT_PUBLIC_CHAIN_NAME || 'CreditCoin Testnet',
   nativeCurrency: {
     decimals: 18,
@@ -11,10 +11,10 @@ export const creditcoinTestnet: Chain = {
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || 'http://localhost:8545'],
+      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network'],
     },
     public: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || 'http://localhost:8545'],
+      http: [process.env.NEXT_PUBLIC_RPC_URL || 'https://rpc.cc3-testnet.creditcoin.network'],
     },
   },
   blockExplorers: {

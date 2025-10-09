@@ -1,6 +1,6 @@
 'use client';
 
-import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { useAccount, useConnect, useDisconnect, useChainId, useSwitchChain } from 'wagmi';
 import { Button } from './ui/Button';
 import { shortenAddress } from '@/lib/utils';
 import { useTokenBalances } from '@/hooks/useTokens';
@@ -14,11 +14,24 @@ import { formatBigInt } from '@/lib/utils';
 
 export function Header() {
   const { address, isConnected } = useAccount();
+  const chainId = useChainId();
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { tctcBalance, rusdBalance } = useTokenBalances();
   const { minRate, weightedAvgRate, maxRate } = useInterestStats();
   const { vaultIds } = useUserVaults();
+  // Auto-switch chain when connected but on wrong chain
+  const { switchChainAsync } = useSwitchChain();
+  const targetId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '102031');
+  useEffect(() => {
+    if (isConnected && !isNaN(targetId) && chainId !== targetId) {
+      (async () => {
+        try {
+          await switchChainAsync({ chainId: targetId });
+        } catch {}
+      })();
+    }
+  }, [isConnected, chainId]);
 
   // Read currently selected vault id from localStorage client-side only
   const [selectedVaultId, setSelectedVaultId] = useState<bigint | undefined>(undefined);
@@ -111,10 +124,29 @@ export function Header() {
               </div>
             ) : (
               <Button
-                onClick={() => {
-                  const injectedConnector = connectors.find((c) => c.id === 'injected');
-                  if (injectedConnector) {
-                    connect({ connector: injectedConnector });
+                onClick={async () => {
+                  // Prefer a ready connector, else first available
+                  const ready = connectors.find((c) => (c as any).ready);
+                  const fallback = connectors[0];
+                  const connector = ready || fallback;
+                  if (connector) {
+                    try {
+                      const res = await connect({ connector });
+                      // Ensure correct chain after connect
+                      const targetId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '102031');
+                      if (!isNaN(targetId) && chainId !== targetId) {
+                        try {
+                          await switchChainAsync({ chainId: targetId });
+                        } catch {}
+                      }
+                    } catch (e) {
+                      // If no injected provider, open MetaMask install
+                      if (typeof window !== 'undefined') {
+                        window.open('https://metamask.io/download', '_blank');
+                      }
+                    }
+                  } else if (typeof window !== 'undefined') {
+                    window.open('https://metamask.io/download', '_blank');
                   }
                 }}
               >
