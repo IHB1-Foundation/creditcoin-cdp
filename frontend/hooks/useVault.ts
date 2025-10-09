@@ -4,7 +4,7 @@ import { VaultManagerABI } from '@/lib/abis/VaultManager';
 import { toast } from 'react-hot-toast';
 import { formatError } from '@/lib/utils';
 
-export interface Vault {
+export interface VaultBasic {
   owner: string;
   collateral: bigint;
   debt: bigint;
@@ -34,10 +34,10 @@ export function useUserVaults() {
  * Hook to get vault data
  */
 export function useVaultData(vaultId: bigint | undefined) {
-  const { data: vault, isLoading, refetch } = useReadContract({
+  const { data: vaultBasic, isLoading, refetch } = useReadContract({
     address: CONTRACTS.VAULT_MANAGER,
     abi: VaultManagerABI,
-    functionName: 'getVault',
+    functionName: 'getVaultBasic',
     args: vaultId !== undefined ? [vaultId] : undefined,
     query: {
       enabled: vaultId !== undefined,
@@ -64,10 +64,21 @@ export function useVaultData(vaultId: bigint | undefined) {
     },
   });
 
+  const { data: interest } = useReadContract({
+    address: CONTRACTS.VAULT_MANAGER,
+    abi: VaultManagerABI,
+    functionName: 'getVaultInterest',
+    args: vaultId !== undefined ? [vaultId] : undefined,
+    query: {
+      enabled: vaultId !== undefined,
+    },
+  });
+
   return {
-    vault: vault as Vault | undefined,
+    vault: vaultBasic as VaultBasic | undefined,
     collateralRatio: ratio as bigint | undefined,
     canLiquidate: canLiquidate as boolean | undefined,
+    interestRate: interest as bigint | undefined,
     isLoading,
     refetch,
   };
@@ -83,13 +94,13 @@ export function useOpenVault() {
     hash,
   });
 
-  const openVault = async (collateralAmount: bigint, debtAmount: bigint) => {
+  const openVault = async (collateralAmount: bigint, debtAmount: bigint, interestRate: bigint) => {
     try {
       await writeContract({
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'openVault',
-        args: [collateralAmount, debtAmount],
+        args: [collateralAmount, debtAmount, interestRate],
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -173,6 +184,36 @@ export function useCloseVault() {
 }
 
 /**
+ * Hook to update vault interest rate
+ */
+export function useUpdateInterest() {
+  const { writeContract, data: hash, isPending, error } = useWriteContract();
+  const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  const updateInterest = async (vaultId: bigint, newRate: bigint) => {
+    try {
+      await writeContract({
+        address: CONTRACTS.VAULT_MANAGER,
+        abi: VaultManagerABI,
+        functionName: 'updateInterestRate',
+        args: [vaultId, newRate],
+      });
+    } catch (err: any) {
+      toast.error(formatError(err));
+      throw err;
+    }
+  };
+
+  return {
+    updateInterest,
+    isPending: isPending || isConfirming,
+    isSuccess,
+    hash,
+    error,
+  };
+}
+
+/**
  * Hook to get protocol parameters
  */
 export function useProtocolParams() {
@@ -203,6 +244,11 @@ export function useProtocolParams() {
         abi: VaultManagerABI,
         functionName: 'totalCollateral',
       },
+      {
+        address: CONTRACTS.VAULT_MANAGER,
+        abi: VaultManagerABI,
+        functionName: 'getTotalDebtCurrent',
+      },
     ],
   });
 
@@ -212,6 +258,29 @@ export function useProtocolParams() {
     redemptionFee: data?.[2]?.result as bigint | undefined,
     totalDebt: data?.[3]?.result as bigint | undefined,
     totalCollateral: data?.[4]?.result as bigint | undefined,
+    totalDebtCurrent: data?.[5]?.result as bigint | undefined,
     isLoading,
+  };
+}
+
+/**
+ * Hook to read system interest stats
+ */
+export function useInterestStats() {
+  const { data, isLoading, refetch } = useReadContract({
+    address: CONTRACTS.VAULT_MANAGER,
+    abi: VaultManagerABI,
+    functionName: 'getInterestStats',
+  });
+
+  // data is tuple [minRate, maxRate, avgRate, count]
+  return {
+    minRate: (data as any)?.[0] as bigint | undefined,
+    maxRate: (data as any)?.[1] as bigint | undefined,
+    avgRate: (data as any)?.[2] as bigint | undefined,
+    weightedAvgRate: (data as any)?.[3] as bigint | undefined,
+    activeVaultCount: (data as any)?.[4] as bigint | undefined,
+    isLoading,
+    refetch,
   };
 }

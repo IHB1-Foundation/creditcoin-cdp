@@ -157,6 +157,96 @@ contract CreditCDPTest is Test {
         vm.stopPrank();
     }
 
+    function testInterestAccrualIncreasesDebt() public {
+        vm.startPrank(alice);
+        wctc.wrap{value: 10 ether}();
+        wctc.approve(address(vaultManager), 10 ether);
+        // Open with 10% interest
+        uint256 vaultId = vaultManager.openVault(10 ether, 10_000e18, 0.10e18);
+        vm.stopPrank();
+
+        // Capture initial stored debt (includes fee)
+        VaultManager.Vault memory beforeV = vaultManager.getVault(vaultId);
+
+        // Fast-forward half a year
+        skip(182 days);
+
+        // Accrue interest via no-op adjust
+        vm.prank(alice);
+        vaultManager.adjustVault(vaultId, 0, 0);
+
+        VaultManager.Vault memory afterV = vaultManager.getVault(vaultId);
+        assertTrue(afterV.debt > beforeV.debt, "debt should accrue");
+
+        // Expected approx increase: debt * 10% * 0.5 ~ 5%
+        uint256 expectedMin = beforeV.debt + (beforeV.debt * 45e15) / 1e18; // ~4.5% lower bound allowing fee rounding
+        uint256 expectedMax = beforeV.debt + (beforeV.debt * 55e15) / 1e18; // ~5.5% upper bound
+        assertTrue(afterV.debt >= expectedMin && afterV.debt <= expectedMax, "accrual within bounds");
+    }
+
+    function testRedemptionTargetsLowestInterest() public {
+        // Alice low interest 2%
+        vm.startPrank(alice);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        uint256 aliceVault = vaultManager.openVault(20 ether, 10_000e18, 0.02e18);
+        vm.stopPrank();
+
+        // Bob higher interest 8%
+        vm.startPrank(bob);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        uint256 bobVault = vaultManager.openVault(20 ether, 10_000e18, 0.08e18);
+        vm.stopPrank();
+
+        // Charlie gets crdUSD to redeem
+        vm.startPrank(charlie);
+        wctc.wrap{value: 30 ether}();
+        wctc.approve(address(vaultManager), 30 ether);
+        vaultManager.openVault(30 ether, 5_000e18);
+
+        // Read debts before
+        uint256 aliceDebtBefore = vaultManager.getVault(aliceVault).debt;
+        uint256 bobDebtBefore = vaultManager.getVault(bobVault).debt;
+
+        rusd.approve(address(vaultManager), 2_000e18);
+        vaultManager.redeem(2_000e18, charlie);
+        vm.stopPrank();
+
+        // After redemption, Alice (lower interest) should have decreased debt
+        uint256 aliceDebtAfter = vaultManager.getVault(aliceVault).debt;
+        uint256 bobDebtAfter = vaultManager.getVault(bobVault).debt;
+        assertTrue(aliceDebtAfter < aliceDebtBefore, "low interest vault should be redeemed first");
+        assertTrue(bobDebtAfter <= bobDebtBefore, "higher interest vault should not increase");
+    }
+
+    function testGetTotalDebtCurrentAndInterestStats() public {
+        // Setup two vaults with different interest and debts
+        vm.startPrank(alice);
+        wctc.wrap{value: 10 ether}();
+        wctc.approve(address(vaultManager), 10 ether);
+        vaultManager.openVault(10 ether, 8_000e18, 0.01e18);
+        vm.stopPrank();
+
+        vm.startPrank(bob);
+        wctc.wrap{value: 20 ether}();
+        wctc.approve(address(vaultManager), 20 ether);
+        vaultManager.openVault(20 ether, 16_000e18, 0.09e18);
+        vm.stopPrank();
+
+        // Baseline totalDebt
+        uint256 baseline = vaultManager.totalDebt();
+        // Move time and ensure current > baseline
+        skip(30 days);
+        uint256 current = vaultManager.getTotalDebtCurrent();
+        assertTrue(current >= baseline, "current should be >= baseline");
+
+        (uint256 minRate, uint256 maxRate, uint256 avgRate, uint256 weightedAvgRate, uint256 count) = vaultManager.getInterestStats();
+        assertEq(count, 2);
+        assertTrue(minRate <= avgRate && avgRate <= maxRate, "avg bounded by min/max");
+        assertTrue(weightedAvgRate >= minRate && weightedAvgRate <= maxRate, "weighted avg bounded");
+    }
+
     function testOpenVaultInsufficientCollateral() public {
         vm.startPrank(alice);
 

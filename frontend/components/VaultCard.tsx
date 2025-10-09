@@ -8,7 +8,7 @@ import { StatCard } from './ui/StatCard';
 import { Tooltip } from './ui/Tooltip';
 import { InfoIcon } from './ui/InfoIcon';
 import { useAccount } from 'wagmi';
-import { useUserVaults, useVaultData, useOpenVault, useAdjustVault, useCloseVault, useProtocolParams } from '@/hooks/useVault';
+import { useUserVaults, useVaultData, useOpenVault, useAdjustVault, useCloseVault, useProtocolParams, useUpdateInterest } from '@/hooks/useVault';
 import { Skeleton } from './ui/Skeleton';
 import { useTokenBalances, useAllowances, useApprove, useWrap } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
@@ -33,9 +33,18 @@ export function VaultCard() {
   const [debtDelta, setDebtDelta] = useState('');
   const [isDeposit, setIsDeposit] = useState(true);
   const [isBorrow, setIsBorrow] = useState(true);
+  const [interestRate, setInterestRate] = useState('5'); // percent
+  const [newInterest, setNewInterest] = useState('');
+
+  useEffect(() => {
+    if (vaultInterest !== undefined) {
+      const percent = Number((vaultInterest * BigInt(10000)) / BigInt(1e18)) / 100;
+      setNewInterest(percent.toString());
+    }
+  }, [vaultInterest]);
 
   const vaultId = vaultIds?.[selectedVaultIndex];
-  const { vault, collateralRatio, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(vaultId);
+  const { vault, collateralRatio, interestRate: vaultInterest, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(vaultId);
   const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { wctcAllowance, rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
 
@@ -44,16 +53,17 @@ export function VaultCard() {
   const { closeVault, isPending: isClosing, isSuccess: closeSuccess } = useCloseVault();
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
   const { wrap, isPending: isWrapping, isSuccess: wrapSuccess } = useWrap();
+  const { updateInterest, isPending: isUpdatingInterest, isSuccess: updateInterestSuccess } = useUpdateInterest();
 
   // Refetch data when transactions succeed
   useEffect(() => {
-    if (openSuccess || adjustSuccess || closeSuccess || wrapSuccess || approveSuccess) {
+    if (openSuccess || adjustSuccess || closeSuccess || wrapSuccess || approveSuccess || updateInterestSuccess) {
       refetchVault();
       refetchVaultIds();
       refetchBalances();
       refetchAllowances();
     }
-  }, [openSuccess, adjustSuccess, closeSuccess, wrapSuccess, approveSuccess]);
+  }, [openSuccess, adjustSuccess, closeSuccess, wrapSuccess, approveSuccess, updateInterestSuccess]);
 
   // Reset form on success
   useEffect(() => {
@@ -101,7 +111,14 @@ export function VaultCard() {
         return;
       }
 
-      await openVault(collateral, debt);
+      // interestRate is a percent string, convert to 1e18
+      const rateNum = Number(interestRate);
+      if (isNaN(rateNum) || rateNum < 0 || rateNum > 10) {
+        toast.error('Interest rate must be between 0% and 10%');
+        return;
+      }
+      const rateWad = parseToBigInt((rateNum / 100).toString());
+      await openVault(collateral, debt, rateWad);
     } catch (error) {
       // Error handling in hook
     }
@@ -288,6 +305,11 @@ export function VaultCard() {
             value={liquidationPrice ? formatUSD(liquidationPrice) : '--'}
             subtitle="Per wCTC"
           />
+          <StatCard
+            label="Interest"
+            value={vaultInterest !== undefined ? formatPercentage(vaultInterest) : '--'}
+            subtitle="Per year"
+          />
         </div>
       )}
 
@@ -364,6 +386,20 @@ export function VaultCard() {
         value={debtAmount}
         onChange={(e) => setDebtAmount(e.target.value)}
       />
+
+      <div>
+        <div className="flex items-center justify-between mb-1">
+          <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
+          <span className="text-xs text-gray-500">0 - 10</span>
+        </div>
+        <Input
+          type="number"
+          placeholder="5.0"
+          value={interestRate}
+          onChange={(e) => setInterestRate(e.target.value)}
+        />
+        <p className="mt-1 text-xs text-gray-500">You can adjust this later. Redemptions target lowest interest first.</p>
+      </div>
 
           {/* Projected health preview */}
           {price && mcr && projectedRatioOpen !== undefined && projectedRatioOpen > BigInt(0) && (
@@ -489,11 +525,11 @@ export function VaultCard() {
             <p className="text-sm text-warning font-medium">
               Closing this vault will repay all debt ({formatBigInt(vault.debt, 18, 2)} crdUSD) and return all collateral ({formatBigInt(vault.collateral)} wCTC).
             </p>
-          </div>
+        </div>
 
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">crdUSD to repay:</span>
+        <div className="space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-600">crdUSD to repay:</span>
               <span className="font-semibold">{formatBigInt(vault.debt, 18, 2)} crdUSD</span>
             </div>
             <div className="flex justify-between">
@@ -522,6 +558,39 @@ export function VaultCard() {
             disabled={rusdBalance !== undefined && rusdBalance < vault.debt}
           >
             {isApproving ? 'Approving...' : 'Close Vault'}
+          </Button>
+        </div>
+      )}
+      {/* Update Interest Section (Adjust Mode) */}
+      {mode === 'adjust' && vault && !vaultLoading && (
+        <div className="mt-4">
+          <div className="flex items-center justify-between mb-1">
+            <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
+            <span className="text-xs text-gray-500">0 - 10</span>
+          </div>
+          <Input
+            type="number"
+            placeholder="5.0"
+            value={newInterest}
+            onChange={(e) => setNewInterest(e.target.value)}
+          />
+          <Button
+            className="mt-2 w-full"
+            variant="secondary"
+            onClick={async () => {
+              if (!vaultId) return;
+              const rateNum = Number(newInterest);
+              if (isNaN(rateNum) || rateNum < 0 || rateNum > 10) {
+                toast.error('Interest rate must be between 0% and 10%');
+                return;
+              }
+              const rateWad = parseToBigInt((rateNum / 100).toString());
+              await updateInterest(vaultId, rateWad);
+              toast.success('Interest updated');
+            }}
+            isLoading={isUpdatingInterest}
+          >
+            Update Interest
           </Button>
         </div>
       )}

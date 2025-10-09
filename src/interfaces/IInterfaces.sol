@@ -27,12 +27,8 @@ interface ITreasury {
 interface IVaultManager {
     function liquidateVault(uint256 vaultId) external returns (uint256 collateralAmount, uint256 debtAmount);
     function canLiquidate(uint256 vaultId) external view returns (bool);
-    function getVault(uint256 vaultId) external view returns (
-        address owner,
-        uint256 collateral,
-        uint256 debt,
-        uint256 timestamp
-    );
+    function getVaultBasic(uint256 vaultId) external view returns (address owner, uint256 collateral, uint256 debt, uint256 timestamp);
+    function getVaultInterest(uint256 vaultId) external view returns (uint256 interest);
 }
 
 interface IStabilityPool {

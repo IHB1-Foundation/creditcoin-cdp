@@ -112,7 +112,7 @@ contract LiquidationEngine {
         if (!vaultManager.canLiquidate(vaultId)) revert VaultNotLiquidatable();
 
         // Get vault info before liquidation
-        (, , uint256 debt, ) = vaultManager.getVault(vaultId);
+        (, , uint256 debt, ) = vaultManager.getVaultBasic(vaultId);
 
         // Check if stability pool can absorb the debt
         if (!stabilityPool.canAbsorbDebt(debt)) revert StabilityPoolInsufficient();
@@ -168,7 +168,7 @@ contract LiquidationEngine {
             }
 
             // Get vault info
-            (, , uint256 debt, ) = vaultManager.getVault(vaultId);
+            (, , uint256 debt, ) = vaultManager.getVaultBasic(vaultId);
 
             // Skip if stability pool can't absorb
             if (!stabilityPool.canAbsorbDebt(debt)) {

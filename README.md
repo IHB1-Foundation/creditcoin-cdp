@@ -20,6 +20,8 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 - **WCTC**: Wrapped tCTC token for use as collateral
 - **Stablecoin (crdUSD)**: Protocol-controlled stablecoin
 - **VaultManager**: Core CDP logic for managing collateralized positions
+  - Borrowers choose a per-vault interest rate (0–10%)
+  - Redemptions execute from lowest-interest vaults first
 - **StabilityPool**: Liquidation buffer that absorbs bad debt
 - **LiquidationEngine**: Handles liquidation of unhealthy vaults
 - **PushOracle**: Owner-updated oracle with staleness checks (replace with Chainlink/API3 in production)

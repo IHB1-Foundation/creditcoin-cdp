@@ -5,6 +5,17 @@ export const VaultManagerABI = [
     inputs: [
       { name: 'collateralAmount', type: 'uint256' },
       { name: 'debtAmount', type: 'uint256' },
+      { name: 'interestRate', type: 'uint256' },
+    ],
+    outputs: [{ name: 'vaultId', type: 'uint256' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    name: 'openVault',
+    inputs: [
+      { name: 'collateralAmount', type: 'uint256' },
+      { name: 'debtAmount', type: 'uint256' },
     ],
     outputs: [{ name: 'vaultId', type: 'uint256' }],
     stateMutability: 'nonpayable',
@@ -39,20 +50,32 @@ export const VaultManagerABI = [
   },
   {
     type: 'function',
-    name: 'getVault',
+    name: 'getVaultBasic',
     inputs: [{ name: 'vaultId', type: 'uint256' }],
     outputs: [
-      {
-        type: 'tuple',
-        components: [
-          { name: 'owner', type: 'address' },
-          { name: 'collateral', type: 'uint256' },
-          { name: 'debt', type: 'uint256' },
-          { name: 'timestamp', type: 'uint256' },
-        ],
-      },
+      { name: 'owner', type: 'address' },
+      { name: 'collateral', type: 'uint256' },
+      { name: 'debt', type: 'uint256' },
+      { name: 'timestamp', type: 'uint256' },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getVaultInterest',
+    inputs: [{ name: 'vaultId', type: 'uint256' }],
+    outputs: [{ name: 'interest', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'updateInterestRate',
+    inputs: [
+      { name: 'vaultId', type: 'uint256' },
+      { name: 'newRate', type: 'uint256' },
+    ],
+    outputs: [],
+    stateMutability: 'nonpayable',
   },
   {
     type: 'function',
@@ -122,6 +145,26 @@ export const VaultManagerABI = [
     name: 'totalCollateral',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getTotalDebtCurrent',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    name: 'getInterestStats',
+    inputs: [],
+    outputs: [
+      { name: 'minRate', type: 'uint256' },
+      { name: 'maxRate', type: 'uint256' },
+      { name: 'avgRate', type: 'uint256' },
+      { name: 'weightedAvgRate', type: 'uint256' },
+      { name: 'count', type: 'uint256' },
+    ],
     stateMutability: 'view',
   },
   {

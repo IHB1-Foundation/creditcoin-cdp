@@ -5,14 +5,15 @@ import { StatCard } from './ui/StatCard';
 import { Tooltip } from './ui/Tooltip';
 import { InfoIcon } from './ui/InfoIcon';
 import { useOracle } from '@/hooks/useOracle';
-import { useProtocolParams } from '@/hooks/useVault';
+import { useProtocolParams, useInterestStats } from '@/hooks/useVault';
 import { formatBigInt, formatCompactBigInt, formatPercentage, formatTimeAgo, formatUSD } from '@/lib/utils';
 import { useEffect } from 'react';
 import { Skeleton } from './ui/Skeleton';
 
 export function OracleInfo() {
   const { price, isFresh, lastUpdateTime, isLoading: oracleLoading, refetch } = useOracle();
-  const { mcr, borrowingFee, redemptionFee, totalDebt, totalCollateral, isLoading: paramsLoading } = useProtocolParams();
+  const { mcr, borrowingFee, redemptionFee, totalDebt, totalCollateral, totalDebtCurrent, isLoading: paramsLoading } = useProtocolParams();
+  const { minRate, maxRate, avgRate, weightedAvgRate, activeVaultCount } = useInterestStats();
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -114,6 +115,18 @@ export function OracleInfo() {
           value={totalDebt ? `${formatCompactBigInt(totalDebt, 18)} crdUSD` : '--'}
           subtitle={totalDebt ? formatUSD(totalDebt) : undefined}
         />
+        <StatCard
+          label={
+            <span className="inline-flex items-center gap-1">
+              Total Debt (Current)
+              <Tooltip content="Includes accrued interest across all active vaults.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
+          value={totalDebtCurrent ? `${formatCompactBigInt(totalDebtCurrent, 18)} crdUSD` : '--'}
+          subtitle={totalDebtCurrent ? formatUSD(totalDebtCurrent) : undefined}
+        />
 
         {/* Total Collateral */}
         <StatCard
@@ -124,6 +137,34 @@ export function OracleInfo() {
               ? formatUSD((totalCollateral * price) / BigInt(1e18))
               : undefined
           }
+        />
+      </div>
+
+      {/* Interest Stats */}
+      <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatCard
+          label="Min Vault Interest"
+          value={minRate !== undefined ? formatPercentage(minRate) : '--'}
+          subtitle={activeVaultCount ? `${activeVaultCount.toString()} active` : undefined}
+        />
+        <StatCard
+          label="Avg Vault Interest"
+          value={avgRate !== undefined ? formatPercentage(avgRate) : '--'}
+        />
+        <StatCard
+          label={
+            <span className="inline-flex items-center gap-1">
+              Max Vault Interest
+              <Tooltip content="Simple average and debt-weighted average across active vaults.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
+          value={maxRate !== undefined ? formatPercentage(maxRate) : '--'}
+        />
+        <StatCard
+          label="Debt-Weighted Avg"
+          value={weightedAvgRate !== undefined ? formatPercentage(weightedAvgRate) : '--'}
         />
       </div>
 

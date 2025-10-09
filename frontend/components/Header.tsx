@@ -4,6 +4,7 @@ import { useAccount, useConnect, useDisconnect } from 'wagmi';
 import { Button } from './ui/Button';
 import { shortenAddress } from '@/lib/utils';
 import { useTokenBalances } from '@/hooks/useTokens';
+import { useInterestStats } from '@/hooks/useVault';
 import { formatBigInt } from '@/lib/utils';
 
 export function Header() {
@@ -11,6 +12,7 @@ export function Header() {
   const { connect, connectors } = useConnect();
   const { disconnect } = useDisconnect();
   const { wctcBalance, rusdBalance } = useTokenBalances();
+  const { minRate } = useInterestStats();
 
   return (
     <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200/80 shadow-sm">
@@ -27,6 +29,11 @@ export function Header() {
           </div>
 
           <div className="flex items-center space-x-4">
+            {minRate !== undefined && (
+              <div className="hidden md:flex items-center px-3 py-1 rounded-full border border-gray-200 bg-gray-50 text-xs text-gray-700">
+                Lowest APR: <span className="ml-1 font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
+              </div>
+            )}
             {isConnected && address && (
               <div className="hidden md:flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="text-right">

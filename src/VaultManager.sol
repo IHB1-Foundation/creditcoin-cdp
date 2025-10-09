@@ -17,12 +17,16 @@ contract VaultManager {
         address owner;
         uint256 collateral; // wCTC amount
         uint256 debt;       // crdUSD amount
+        uint256 interestRate; // Borrower-chosen interest rate (1e18 = 100%)
         uint256 timestamp;  // Last update time
     }
 
     // Constants with 18 decimals precision
     uint256 private constant PRECISION = 1e18;
     uint256 private constant MIN_DEBT = 100e18; // Minimum 100 crdUSD debt
+    uint256 private constant MAX_INTEREST = 0.1e18; // Max 10% interest
+    uint256 private constant DEFAULT_INTEREST = 5e16; // 5%
+    uint256 private constant SECONDS_PER_YEAR = 365 days;
 
     // Contract references
     IERC20 public immutable collateralToken;    // wCTC
@@ -175,8 +179,24 @@ contract VaultManager {
         external
         returns (uint256 vaultId)
     {
+        // Backwards-compatible overload: default interest
+        return openVault(collateralAmount, debtAmount, DEFAULT_INTEREST);
+    }
+
+    /**
+     * @notice Open a new vault with collateral, debt, and chosen interest rate
+     * @param collateralAmount Amount of wCTC to deposit
+     * @param debtAmount Amount of crdUSD to borrow
+     * @param interestRate Borrower-chosen interest rate (1e18 = 100%)
+     * @return vaultId ID of the newly created vault
+     */
+    function openVault(uint256 collateralAmount, uint256 debtAmount, uint256 interestRate)
+        public
+        returns (uint256 vaultId)
+    {
         if (collateralAmount == 0) revert ZeroAmount();
         if (debtAmount < MIN_DEBT) revert DebtTooLow();
+        if (interestRate > MAX_INTEREST) revert InvalidParameters();
 
         // Get current price
         uint256 price = oracle.getPrice();
@@ -197,6 +217,7 @@ contract VaultManager {
             owner: msg.sender,
             collateral: collateralAmount,
             debt: totalDebtWithFee,
+            interestRate: interestRate,
             timestamp: block.timestamp
         });
 
@@ -234,6 +255,9 @@ contract VaultManager {
         onlyVaultOwner(vaultId)
     {
         Vault storage vault = vaults[vaultId];
+
+        // Accrue interest before any changes
+        _accrueInterest(vault);
 
         // Calculate new amounts
         uint256 newCollateral = _applyDelta(vault.collateral, collateralDelta);
@@ -309,6 +333,9 @@ contract VaultManager {
     {
         Vault storage vault = vaults[vaultId];
 
+        // Accrue interest before closing
+        _accrueInterest(vault);
+
         uint256 collateralAmount = vault.collateral;
         uint256 debtAmount = vault.debt;
 
@@ -337,8 +364,8 @@ contract VaultManager {
     // =============================================================
 
     /**
-     * @notice Redeem crdUSD for wCTC collateral from the riskiest vaults
-     * @dev Targets vaults with lowest collateral ratio first
+     * @notice Redeem crdUSD for wCTC collateral from lowest-interest vaults
+     * @dev Targets vaults with lowest interest rate first; skips vaults below MCR
      * @param rUSDAmount Amount of crdUSD to burn for redemption
      * @param receiver Address to receive the redeemed wCTC
      * @return collateralRedeemed Total amount of wCTC sent to receiver (after fee)
@@ -353,21 +380,24 @@ contract VaultManager {
         // Get current price
         uint256 price = oracle.getPrice();
 
-        // Find vaults sorted by health (lowest collateral ratio first)
-        uint256[] memory sortedVaultIds = _getSortedVaultsByHealth();
+        // Find vaults sorted by interest (lowest first)
+        uint256[] memory sortedVaultIds = _getSortedVaultsByInterest();
 
         if (sortedVaultIds.length == 0) revert InsufficientRedeemableVaults();
 
         uint256 remainingDebt = rUSDAmount;
         uint256 totalCollateralRedeemed = 0;
 
-        // Redeem from vaults starting with least healthy
+        // Redeem from vaults starting with lowest interest
         for (uint256 i = 0; i < sortedVaultIds.length && remainingDebt > 0; i++) {
             uint256 vaultId = sortedVaultIds[i];
             Vault storage vault = vaults[vaultId];
 
             // Skip closed or liquidatable vaults
             if (vault.owner == address(0) || vault.debt == 0) continue;
+
+            // Accrue interest on this vault before redeeming
+            _accrueInterest(vault);
 
             // Check if vault is below MCR (skip if liquidatable)
             uint256 collateralValue = (vault.collateral * price) / PRECISION;
@@ -499,6 +529,9 @@ contract VaultManager {
     {
         Vault storage vault = vaults[vaultId];
 
+        // Accrue interest before liquidation
+        _accrueInterest(vault);
+
         collateralAmount = vault.collateral;
         debtAmount = vault.debt;
 
@@ -522,6 +555,47 @@ contract VaultManager {
     // =============================================================
 
     /**
+     * @notice Get basic vault details (compat with prior interface)
+     */
+    function getVaultBasic(uint256 vaultId)
+        external
+        view
+        vaultExists(vaultId)
+        returns (address owner_, uint256 collateral_, uint256 debt_, uint256 timestamp_)
+    {
+        Vault storage v = vaults[vaultId];
+        return (v.owner, v.collateral, v.debt, v.timestamp);
+    }
+
+    /**
+     * @notice Get the interest rate for a vault
+     */
+    function getVaultInterest(uint256 vaultId)
+        external
+        view
+        vaultExists(vaultId)
+        returns (uint256 interest)
+    {
+        return vaults[vaultId].interestRate;
+    }
+
+    /**
+     * @notice Update vault interest rate
+     * @param vaultId ID of the vault
+     * @param newRate New interest rate (1e18 = 100%)
+     */
+    function updateInterestRate(uint256 vaultId, uint256 newRate)
+        external
+        vaultExists(vaultId)
+        onlyVaultOwner(vaultId)
+    {
+        if (newRate > MAX_INTEREST) revert InvalidParameters();
+        Vault storage v = vaults[vaultId];
+        v.interestRate = newRate;
+        v.timestamp = block.timestamp;
+    }
+
+    /**
      * @notice Calculate the collateral ratio of a vault
      * @param vaultId ID of the vault
      * @return ratio Collateral ratio with 18 decimals (e.g., 1.5e18 = 150%)
@@ -533,12 +607,12 @@ contract VaultManager {
         returns (uint256 ratio)
     {
         Vault storage vault = vaults[vaultId];
-        if (vault.debt == 0) return type(uint256).max;
+        uint256 currentDebt = _accruedDebtView(vault);
+        if (currentDebt == 0) return type(uint256).max;
 
         uint256 price = oracle.getPrice();
         uint256 collateralValue = (vault.collateral * price) / PRECISION;
-
-        return (collateralValue * PRECISION) / vault.debt;
+        return (collateralValue * PRECISION) / currentDebt;
     }
 
     /**
@@ -553,14 +627,14 @@ contract VaultManager {
         returns (bool canLiquidate)
     {
         Vault storage vault = vaults[vaultId];
-        if (vault.debt == 0) return false;
+        uint256 currentDebt = _accruedDebtView(vault);
+        if (currentDebt == 0) return false;
 
         if (!oracle.isFresh()) return false;
 
         uint256 price = oracle.getPrice();
         uint256 collateralValue = (vault.collateral * price) / PRECISION;
-        uint256 requiredCollateral = (vault.debt * minCollateralRatio) / PRECISION;
-
+        uint256 requiredCollateral = (currentDebt * minCollateralRatio) / PRECISION;
         return collateralValue < requiredCollateral;
     }
 
@@ -585,6 +659,59 @@ contract VaultManager {
      */
     function getUserVaults(address user) external view returns (uint256[] memory vaultIds) {
         return userVaults[user];
+    }
+
+    /**
+     * @notice Get current total system debt including accrued interest
+     */
+    function getTotalDebtCurrent() external view returns (uint256 total) {
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage v = vaults[i];
+            if (v.owner != address(0) && v.debt > 0) {
+                total += _accruedDebtView(v);
+            }
+        }
+    }
+
+    /**
+     * @notice Get basic interest statistics across active vaults
+     * @return minRate Minimum interest rate among active vaults
+     * @return maxRate Maximum interest rate among active vaults
+     * @return avgRate Average interest rate among active vaults
+     * @return count Number of active vaults considered
+     */
+    function getInterestStats()
+        external
+        view
+        returns (uint256 minRate, uint256 maxRate, uint256 avgRate, uint256 weightedAvgRate, uint256 count)
+    {
+        uint256 sum;
+        uint256 weightedSum;
+        uint256 sumDebt;
+        bool init;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage v = vaults[i];
+            if (v.owner != address(0) && v.debt > 0) {
+                if (!init) {
+                    minRate = v.interestRate;
+                    maxRate = v.interestRate;
+                    init = true;
+                } else {
+                    if (v.interestRate < minRate) minRate = v.interestRate;
+                    if (v.interestRate > maxRate) maxRate = v.interestRate;
+                }
+                sum += v.interestRate;
+                weightedSum += v.interestRate * v.debt;
+                sumDebt += v.debt;
+                count++;
+            }
+        }
+        if (count > 0) {
+            avgRate = sum / count;
+        }
+        if (sumDebt > 0) {
+            weightedAvgRate = weightedSum / sumDebt;
+        }
     }
 
     // =============================================================
@@ -701,5 +828,73 @@ contract VaultManager {
         }
 
         return sortedIds;
+    }
+
+    /**
+     * @notice Get all active vaults sorted by interest rate (ascending)
+     * @dev Simple bubble sort for MVP
+     */
+    function _getSortedVaultsByInterest() private view returns (uint256[] memory sortedIds) {
+        uint256 activeCount = 0;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            if (vaults[i].owner != address(0) && vaults[i].debt > 0) {
+                activeCount++;
+            }
+        }
+
+        if (activeCount == 0) {
+            return new uint256[](0);
+        }
+
+        sortedIds = new uint256[](activeCount);
+        uint256[] memory rates = new uint256[](activeCount);
+
+        uint256 index = 0;
+        for (uint256 i = 1; i < nextVaultId; i++) {
+            Vault storage v = vaults[i];
+            if (v.owner != address(0) && v.debt > 0) {
+                sortedIds[index] = i;
+                rates[index] = v.interestRate;
+                index++;
+            }
+        }
+
+        for (uint256 i = 0; i < activeCount; i++) {
+            for (uint256 j = i + 1; j < activeCount; j++) {
+                if (rates[j] < rates[i]) {
+                    uint256 tr = rates[i];
+                    rates[i] = rates[j];
+                    rates[j] = tr;
+
+                    uint256 tid = sortedIds[i];
+                    sortedIds[i] = sortedIds[j];
+                    sortedIds[j] = tid;
+                }
+            }
+        }
+        return sortedIds;
+    }
+
+    /**
+     * @notice Calculate pending interest for a vault (view)
+     */
+    function _pendingInterest(Vault storage v) private view returns (uint256 interest) {
+        if (v.debt == 0 || v.interestRate == 0) return 0;
+        uint256 dt = block.timestamp - v.timestamp;
+        if (dt == 0) return 0;
+        interest = (v.debt * v.interestRate * dt) / (PRECISION * SECONDS_PER_YEAR);
+    }
+
+    function _accruedDebtView(Vault storage v) private view returns (uint256) {
+        return v.debt + _pendingInterest(v);
+    }
+
+    function _accrueInterest(Vault storage v) private {
+        uint256 interest = _pendingInterest(v);
+        if (interest > 0) {
+            v.debt += interest;
+            totalDebt += interest;
+            v.timestamp = block.timestamp;
+        }
     }
 }

@@ -10,6 +10,7 @@ import { useRedemptionEstimate, useRedeem } from '@/hooks/useRedemption';
 import { useTokenBalances, useAllowances, useApprove } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { CONTRACTS } from '@/lib/config';
+import { useInterestStats } from '@/hooks/useVault';
 import { formatBigInt, formatPercentage, formatUSD, parseToBigInt } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
@@ -25,6 +26,7 @@ export function RedemptionCard() {
   const { estimatedCollateral, grossCollateral, feeAmount, redemptionFeeRate } = useRedemptionEstimate(amountBigInt);
   const { redeem, isPending: isRedeeming, isSuccess: redeemSuccess } = useRedeem();
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
+  const { minRate, maxRate } = useInterestStats();
 
   // Refetch data when transactions succeed
   useEffect(() => {
@@ -135,8 +137,26 @@ export function RedemptionCard() {
                 )}
               </div>
             </div>
+            {(minRate !== undefined) && (
+              <div className="pt-2 text-xs text-gray-600">
+                Targets lowest-interest vaults first. Current lowest APR: <span className="font-medium">{(Number(minRate) * 100 / 1e18).toFixed(2)}%</span>
+              </div>
+            )}
           </div>
         )}
+
+        {/* Redemption Target Policy */}
+        <div className="rounded-xl p-3 bg-gray-50 border border-gray-100">
+          <p className="text-xs text-gray-600">
+            Redemptions target vaults with the lowest interest first.
+            {minRate !== undefined && maxRate !== undefined && (
+              <>
+                {' '}Current range: <span className="font-medium">{minRate ? `${(Number(minRate) * 100 / 1e18).toFixed(2)}%` : '--'}</span>
+                {' '}– <span className="font-medium">{maxRate ? `${(Number(maxRate) * 100 / 1e18).toFixed(2)}%` : '--'}</span> APR.
+              </>
+            )}
+          </p>
+        </div>
 
         <Button
           className="w-full"
@@ -164,7 +184,7 @@ export function RedemptionCard() {
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How redemptions work</p>
         <ul className="text-sm text-primary-800 space-y-1">
           <li>• Burn your crdUSD to receive wCTC at oracle price</li>
-          <li>• Protocol targets riskiest vaults first</li>
+          <li>• Protocol targets lowest-interest vaults first</li>
           <li>• Great arbitrage when crdUSD trades below $1</li>
           <li>• Helps maintain the crdUSD peg</li>
         </ul>
