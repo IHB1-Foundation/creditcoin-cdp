@@ -54,13 +54,13 @@ export function RedemptionCard() {
       }
 
       if (rusdBalance !== undefined && redeemAmount > rusdBalance) {
-        toast.error('Insufficient rUSD balance');
+        toast.error('Insufficient crdUSD balance');
         return;
       }
 
       // Check approval
       if (rusdAllowance === undefined || rusdAllowance < redeemAmount) {
-        toast('Approving rUSD...', { icon: '⏳' });
+        toast('Approving crdUSD...', { icon: '⏳' });
         await approve('rusd', CONTRACTS.VAULT_MANAGER, redeemAmount * BigInt(2));
         return;
       }
@@ -73,7 +73,7 @@ export function RedemptionCard() {
 
   if (!isConnected) {
     return (
-      <Card title="Redemption" subtitle="Redeem rUSD for wCTC">
+      <Card title="Redemption" subtitle="Redeem crdUSD for wCTC">
         <div className="text-center py-12">
           <p className="text-gray-500">Connect your wallet to redeem</p>
         </div>
@@ -82,12 +82,12 @@ export function RedemptionCard() {
   }
 
   return (
-    <Card title="Redemption" subtitle="Burn rUSD to receive wCTC collateral">
-      {/* Redemption Form */}
-      <div className="space-y-4">
+    <Card title="Redemption" subtitle="Burn crdUSD to receive wCTC collateral">
+      {/* Amount */}
+      <div className="space-y-3">
         <Input
           type="number"
-          label="rUSD Amount to Redeem"
+          label="crdUSD Amount"
           placeholder="0.0"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -101,35 +101,35 @@ export function RedemptionCard() {
           }
         />
 
-        <div className="text-sm text-gray-600">
-          Available: {rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'} rUSD
+        <div className="text-xs text-gray-500">
+          Available: <span className="font-medium text-gray-700">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'}</span> crdUSD
         </div>
 
-        {/* Estimate Display */}
+        {/* Estimate */}
         {amountBigInt && amountBigInt > BigInt(0) && estimatedCollateral !== undefined && (
-          <div className="p-4 bg-gray-50 rounded-lg space-y-3">
+          <div className="rounded-xl p-4 border border-gray-100 bg-gradient-to-br from-gray-50 to-white space-y-3">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Gross Collateral</span>
-              <span className="font-semibold">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Collateral</span>
+              <span className="font-semibold text-gray-900">
                 {grossCollateral ? formatBigInt(grossCollateral, 18, 4) : '--'} wCTC
               </span>
             </div>
 
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Redemption Fee ({redemptionFeeRate ? formatPercentage(redemptionFeeRate) : '--'})</span>
-              <span className="text-sm text-error">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Redemption Fee {redemptionFeeRate ? `(${formatPercentage(redemptionFeeRate)})` : ''}</span>
+              <span className="text-sm text-error font-medium">
                 - {feeAmount ? formatBigInt(feeAmount, 18, 4) : '--'} wCTC
               </span>
             </div>
 
             <div className="border-t border-gray-200 pt-3 flex justify-between items-center">
-              <span className="font-medium text-gray-900">You Will Receive</span>
+              <span className="text-sm font-medium text-gray-700">You Will Receive</span>
               <div className="text-right">
-                <p className="font-bold text-lg text-success">
+                <p className="font-semibold text-lg text-success">
                   {formatBigInt(estimatedCollateral, 18, 4)} wCTC
                 </p>
                 {price && (
-                  <p className="text-sm text-gray-500">
+                  <p className="text-xs text-gray-500">
                     ≈ {formatUSD((estimatedCollateral * price) / BigInt(1e18))}
                   </p>
                 )}
@@ -149,7 +149,7 @@ export function RedemptionCard() {
       </div>
 
       {/* Info Box */}
-      <div className="mt-6 p-4 bg-warning/10 border border-warning/20 rounded-lg">
+      <div className="mt-6 p-4 bg-warning/10 border border-warning/20 rounded-xl">
         <p className="text-sm text-warning font-medium mb-2">⚠️ Important</p>
         <ul className="text-sm text-gray-700 space-y-1">
           <li>• Redemptions target vaults with lowest collateral ratio</li>
@@ -160,13 +160,13 @@ export function RedemptionCard() {
       </div>
 
       {/* How it Works */}
-      <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+      <div className="mt-4 p-4 bg-primary-50 border border-primary-200 rounded-xl">
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How redemptions work</p>
         <ul className="text-sm text-primary-800 space-y-1">
-          <li>• Burn your rUSD to receive wCTC at oracle price</li>
+          <li>• Burn your crdUSD to receive wCTC at oracle price</li>
           <li>• Protocol targets riskiest vaults first</li>
-          <li>• Great arbitrage when rUSD trades below $1</li>
-          <li>• Helps maintain the rUSD peg</li>
+          <li>• Great arbitrage when crdUSD trades below $1</li>
+          <li>• Helps maintain the crdUSD peg</li>
         </ul>
       </div>
     </Card>

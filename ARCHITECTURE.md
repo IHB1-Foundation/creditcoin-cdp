@@ -6,7 +6,7 @@ Credit CDP is a clean-room implementation of a collateralized debt position (CDP
 
 ### Core Concept
 
-Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The protocol ensures system solvency through:
+Users deposit wCTC (wrapped tCTC) as collateral to mint crdUSD (stablecoin). The protocol ensures system solvency through:
 - Minimum Collateral Ratio (MCR) enforcement
 - Liquidation mechanism for under-collateralized vaults
 - Stability Pool for absorbing liquidated debt
@@ -35,7 +35,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The p
 │  ┌──────────────┐                  │                             │
 │  │ Stablecoin   │◄─────────────────┤                             │
 │  │   .sol       │                  │                             │
-│  │   (rUSD)     │                  │                             │
+│  │  (crdUSD)    │                  │                             │
 │  └──────┬───────┘                  │                             │
 │         │                          │                             │
 │         │         ┌────────────────▼──────────┐                  │
@@ -74,7 +74,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The p
 
 ---
 
-### 2. Stablecoin.sol - rUSD Token
+### 2. Stablecoin.sol - crdUSD Token
 
 **Purpose**: Protocol-controlled stablecoin (soft-pegged to $1 USD)
 
@@ -118,7 +118,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The p
 - `adjustVault(uint256 vaultId, int256 collateralDelta, int256 debtDelta)` - Modify position
 - `closeVault(uint256 vaultId)` - Repay debt and withdraw collateral
 - `getVaultHealth(uint256 vaultId)` - Calculate collateral ratio
-- `redeem(uint256 rUSDAmount, address receiver)` - Redeem rUSD for wCTC from riskiest vaults
+- `redeem(uint256 rUSDAmount, address receiver)` - Redeem crdUSD for wCTC from riskiest vaults
 - `getRedeemableAmount(uint256 rUSDAmount)` - Estimate collateral for redemption
 - `getRedemptionFee(uint256 collateralAmount)` - Calculate redemption fee
 
@@ -127,7 +127,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint rUSD (stablecoin). The p
 struct Vault {
     address owner;
     uint256 collateral;  // wCTC amount
-    uint256 debt;        // rUSD amount
+    uint256 debt;        // crdUSD amount
     uint256 timestamp;   // Last update time
 }
 ```
@@ -168,23 +168,23 @@ struct Vault {
 
 ### 6. StabilityPool.sol - Liquidation Buffer
 
-**Purpose**: Accept rUSD deposits to absorb liquidated debt
+**Purpose**: Accept crdUSD deposits to absorb liquidated debt
 
 **Key Functions**:
-- `deposit(uint256 amount)` - Deposit rUSD
-- `withdraw(uint256 amount)` - Withdraw rUSD + accumulated wCTC
+- `deposit(uint256 amount)` - Deposit crdUSD
+- `withdraw(uint256 amount)` - Withdraw crdUSD + accumulated wCTC
 - `absorbDebt(uint256 debtAmount, uint256 collateralAmount)` - Process liquidation
 - `getDepositorGains(address depositor)` - View wCTC gains
 
 **Mechanism**:
-- Users deposit rUSD
+- Users deposit crdUSD
 - During liquidations:
-  - rUSD is burned to offset debt
+  - crdUSD is burned to offset debt
   - wCTC collateral is distributed proportionally
 - Depositors earn wCTC at discounted prices
 
 **State Tracking**:
-- Total rUSD deposited
+- Total crdUSD deposited
 - Individual deposit snapshots
 - Cumulative collateral gains per depositor
 
@@ -223,7 +223,7 @@ VaultManager
   │
   ├─► 5. Calculate borrowing fee
   │
-  ├─► 6. Mint rUSD to user
+  ├─► 6. Mint crdUSD to user
   │
   └─► 7. Emit VaultOpened event
 ```
@@ -247,7 +247,7 @@ LiquidationEngine
   │
 StabilityPool
   │
-  ├─► 6. Burn rUSD from pool
+  ├─► 6. Burn crdUSD from pool
   │
   ├─► 7. Distribute wCTC to depositors
   │
@@ -259,13 +259,13 @@ StabilityPool
 ```
 Depositor
   │
-  ├─► 1. Approve rUSD to StabilityPool
+  ├─► 1. Approve crdUSD to StabilityPool
   │
   ├─► 2. Call deposit(amount)
   │
 StabilityPool
   │
-  ├─► 3. Transfer rUSD from depositor
+  ├─► 3. Transfer crdUSD from depositor
   │
   ├─► 4. Update deposit snapshot
   │
@@ -279,7 +279,7 @@ StabilityPool
 ```
 Redeemer
   │
-  ├─► 1. Approve rUSD to VaultManager
+  ├─► 1. Approve crdUSD to VaultManager
   │
   ├─► 2. Call redeem(amount, receiver)
   │
@@ -294,7 +294,7 @@ VaultManager
   │     ├─► Reduce vault debt and collateral
   │     └─► Close vault if debt < MIN_DEBT
   │
-  ├─► 5. Burn rUSD from redeemer
+  ├─► 5. Burn crdUSD from redeemer
   │
   ├─► 6. Apply redemption fee
   │
@@ -355,7 +355,7 @@ evm_version = "london"
    - Penalty covers gas costs + profit margin
    - Monitor network congestion
 
-3. **Stability Pool Solvency**: Must have sufficient rUSD to absorb debt
+3. **Stability Pool Solvency**: Must have sufficient crdUSD to absorb debt
    - Monitor pool depth
    - Implement recovery mode if needed
 
@@ -396,7 +396,7 @@ evm_version = "london"
 ## Deployment Order
 
 1. Deploy WCTC (wrapper token)
-2. Deploy Stablecoin (rUSD)
+2. Deploy Stablecoin (crdUSD)
 3. Deploy PushOracle
 4. Deploy Treasury
 5. Deploy VaultManager (with dependencies)

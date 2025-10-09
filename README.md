@@ -6,10 +6,10 @@ A clean-room implementation of a collateralized debt position (CDP) protocol ins
 
 Credit CDP allows users to:
 - Deposit wCTC (wrapped tCTC) as collateral
-- Borrow rUSD (stablecoin) against collateral
+- Borrow crdUSD (stablecoin) against collateral
 - Participate in the Stability Pool to earn liquidation rewards
 - Liquidate under-collateralized vaults
-- Redeem rUSD for wCTC collateral at oracle price
+- Redeem crdUSD for wCTC collateral at oracle price
 
 ## Architecture
 
@@ -18,11 +18,12 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 ### Core Components
 
 - **WCTC**: Wrapped tCTC token for use as collateral
-- **Stablecoin (rUSD)**: Protocol-controlled stablecoin
+- **Stablecoin (crdUSD)**: Protocol-controlled stablecoin
 - **VaultManager**: Core CDP logic for managing collateralized positions
 - **StabilityPool**: Liquidation buffer that absorbs bad debt
 - **LiquidationEngine**: Handles liquidation of unhealthy vaults
-- **PushOracle**: Mock price oracle (replace with Chainlink/API3 in production)
+- **PushOracle**: Owner-updated oracle with staleness checks (replace with Chainlink/API3 in production)
+- **MockOracle**: Deterministic mock that returns a pseudo-random price in [$0.52,$0.58]
 - **Treasury**: Collects protocol fees and liquidation penalties
 
 ### Key Parameters
@@ -173,17 +174,17 @@ wctc.wrap{value: 10 ether}();
 // 2. Approve VaultManager to spend wCTC
 wctc.approve(address(vaultManager), 10 ether);
 
-// 3. Open vault with 10 wCTC collateral, borrow 10,000 rUSD
+// 3. Open vault with 10 wCTC collateral, borrow 10,000 crdUSD
 uint256 vaultId = vaultManager.openVault(10 ether, 10_000e18);
 ```
 
 ### Depositing to Stability Pool
 
 ```solidity
-// 1. Approve StabilityPool to spend rUSD
-rusd.approve(address(stabilityPool), 5000e18);
+// 1. Approve StabilityPool to spend crdUSD
+stablecoin.approve(address(stabilityPool), 5000e18);
 
-// 2. Deposit rUSD
+// 2. Deposit crdUSD
 stabilityPool.deposit(5000e18);
 
 // 3. Later, withdraw collateral gains
@@ -202,17 +203,17 @@ if (canLiquidate) {
 }
 ```
 
-### Redeeming rUSD for Collateral
+### Redeeming crdUSD for Collateral
 
 ```solidity
-// User has 10,000 rUSD and wants to redeem for wCTC
+// User has 10,000 crdUSD and wants to redeem for wCTC
 uint256 redemptionAmount = 10_000e18;
 
 // Check how much wCTC they'll receive
 uint256 estimatedWCTC = vaultManager.getRedeemableAmount(redemptionAmount);
 
 // Approve and redeem
-rusd.approve(address(vaultManager), redemptionAmount);
+stablecoin.approve(address(vaultManager), redemptionAmount);
 uint256 wctcReceived = vaultManager.redeem(redemptionAmount, msg.sender);
 
 // wctcReceived = actual wCTC received (after 0.5% fee)
@@ -224,7 +225,7 @@ uint256 wctcReceived = vaultManager.redeem(redemptionAmount, msg.sender);
 credit-cdp/
 ├── src/
 │   ├── WCTC.sol                 # Wrapped tCTC token
-│   ├── Stablecoin.sol           # rUSD stablecoin
+│   ├── Stablecoin.sol           # crdUSD stablecoin
 │   ├── PushOracle.sol           # Mock price oracle
 │   ├── Treasury.sol             # Fee collection
 │   ├── VaultManager.sol         # Core CDP logic

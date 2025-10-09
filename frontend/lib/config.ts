@@ -41,6 +41,6 @@ export const CONTRACTS = {
 // Protocol Parameters
 export const PROTOCOL_PARAMS = {
   PRECISION: BigInt(1e18),
-  MIN_DEBT: BigInt(100) * BigInt(1e18), // 100 rUSD
+  MIN_DEBT: BigInt(100) * BigInt(1e18), // 100 crdUSD
   DECIMALS: 18,
 } as const;

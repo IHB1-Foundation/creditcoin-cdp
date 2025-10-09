@@ -140,7 +140,7 @@ contract CreditCDPTest is Test {
         wctc.wrap{value: 10 ether}();
         wctc.approve(address(vaultManager), 10 ether);
 
-        // Borrow 10,000 rUSD (requires ~13,000 collateral at 130% MCR)
+        // Borrow 10,000 crdUSD (requires ~13,000 collateral at 130% MCR)
         uint256 debtAmount = 10_000e18;
         uint256 vaultId = vaultManager.openVault(10 ether, debtAmount);
 
@@ -194,11 +194,11 @@ contract CreditCDPTest is Test {
 
         vm.startPrank(alice);
 
-        // Alice needs additional rUSD to cover the fee portion
+        // Alice needs additional crdUSD to cover the fee portion
         // Open another small vault to get the fee amount
         wctc.wrap{value: 1 ether}();
         wctc.approve(address(vaultManager), 1 ether);
-        vaultManager.openVault(1 ether, 100e18); // Small vault for extra rUSD
+        vaultManager.openVault(1 ether, 100e18); // Small vault for extra crdUSD
 
         // Approve repayment
         rusd.approve(address(vaultManager), vault.debt);
@@ -229,12 +229,12 @@ contract CreditCDPTest is Test {
     // =============================================================
 
     function testStabilityPoolDeposit() public {
-        // Alice opens vault and gets rUSD
+        // Alice opens vault and gets crdUSD
         _openVaultForAlice(10 ether, 10_000e18);
 
         vm.startPrank(alice);
 
-        // Deposit 5000 rUSD into stability pool
+        // Deposit 5000 crdUSD into stability pool
         rusd.approve(address(stabilityPool), 5000e18);
         stabilityPool.deposit(5000e18);
 
@@ -253,7 +253,7 @@ contract CreditCDPTest is Test {
         rusd.approve(address(stabilityPool), 5000e18);
         stabilityPool.deposit(5000e18);
 
-        // Withdraw 2000 rUSD
+        // Withdraw 2000 crdUSD
         stabilityPool.withdraw(2000e18);
 
         (uint256 depositAmount, ) = stabilityPool.getDepositorInfo(alice);
@@ -361,7 +361,7 @@ contract CreditCDPTest is Test {
         // 10 wCTC * $2000 = $20,000, borrowing $14,000 gives ~140% CR
         uint256 vaultId = _openVaultForAlice(10 ether, 14_000e18);
 
-        // Bob gets rUSD to redeem
+        // Bob gets crdUSD to redeem
         _openVaultForBob(20 ether, 20_000e18);
 
         vm.startPrank(bob);
@@ -369,7 +369,7 @@ contract CreditCDPTest is Test {
         uint256 bobRUSDBalanceBefore = rusd.balanceOf(bob);
         uint256 bobWCTCBalanceBefore = wctc.balanceOf(bob);
 
-        // Bob redeems 5000 rUSD
+        // Bob redeems 5000 crdUSD
         uint256 redemptionAmount = 5000e18;
         rusd.approve(address(vaultManager), redemptionAmount);
 
@@ -378,11 +378,11 @@ contract CreditCDPTest is Test {
         uint256 bobRUSDBalanceAfter = rusd.balanceOf(bob);
         uint256 bobWCTCBalanceAfter = wctc.balanceOf(bob);
 
-        // Bob should have burned rUSD
+        // Bob should have burned crdUSD
         assertEq(bobRUSDBalanceBefore - bobRUSDBalanceAfter, redemptionAmount);
 
         // Bob should have received wCTC (amount depends on price and fee)
-        // At $2000/wCTC: 5000 rUSD = 2.5 wCTC before fee
+        // At $2000/wCTC: 5000 crdUSD = 2.5 wCTC before fee
         // With 0.5% fee: ~2.4875 wCTC
         assertTrue(collateralReceived > 2.4 ether && collateralReceived < 2.5 ether);
         assertEq(bobWCTCBalanceAfter - bobWCTCBalanceBefore, collateralReceived);
@@ -402,7 +402,7 @@ contract CreditCDPTest is Test {
         // Bob opens vault with 160% CR (safer)
         uint256 vaultId2 = _openVaultForBob(10 ether, 12_000e18);
 
-        // Charlie gets rUSD to redeem
+        // Charlie gets crdUSD to redeem
         vm.startPrank(charlie);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
@@ -463,7 +463,7 @@ contract CreditCDPTest is Test {
         // Alice opens vault
         _openVaultForAlice(10 ether, 10_000e18);
 
-        // Bob gets rUSD
+        // Bob gets crdUSD
         _openVaultForBob(20 ether, 10_000e18);
 
         vm.startPrank(bob);
@@ -493,7 +493,7 @@ contract CreditCDPTest is Test {
         // Bob opens vault that will become liquidatable
         uint256 vaultId2 = _openVaultForBob(10 ether, 15_000e18);
 
-        // Charlie opens vault to get rUSD for redemption
+        // Charlie opens vault to get crdUSD for redemption
         vm.startPrank(charlie);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
@@ -546,7 +546,7 @@ contract CreditCDPTest is Test {
         wctc.approve(address(vaultManager), 100 ether);
         vaultManager.openVault(100 ether, 50_000e18);
 
-        // Bob redeems almost all of Alice's debt, leaving it below MIN_DEBT (100 rUSD)
+        // Bob redeems almost all of Alice's debt, leaving it below MIN_DEBT (100 crdUSD)
         // Alice's debt is ~$14,070 (including fee), redeeming $14,050 leaves ~$20 which is below MIN_DEBT
         rusd.approve(address(vaultManager), 14_050e18);
         vaultManager.redeem(14_050e18, bob);
@@ -578,7 +578,7 @@ contract CreditCDPTest is Test {
         // Open vault
         _openVaultForAlice(10 ether, 10_000e18);
 
-        // Bob gets rUSD
+        // Bob gets crdUSD
         _openVaultForBob(20 ether, 10_000e18);
 
         vm.startPrank(bob);

@@ -2,14 +2,17 @@
 
 import { Card } from './ui/Card';
 import { StatCard } from './ui/StatCard';
+import { Tooltip } from './ui/Tooltip';
+import { InfoIcon } from './ui/InfoIcon';
 import { useOracle } from '@/hooks/useOracle';
 import { useProtocolParams } from '@/hooks/useVault';
-import { formatBigInt, formatPercentage, formatTimeAgo, formatUSD } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, formatPercentage, formatTimeAgo, formatUSD } from '@/lib/utils';
 import { useEffect } from 'react';
+import { Skeleton } from './ui/Skeleton';
 
 export function OracleInfo() {
-  const { price, isFresh, lastUpdateTime, refetch } = useOracle();
-  const { mcr, borrowingFee, redemptionFee, totalDebt, totalCollateral } = useProtocolParams();
+  const { price, isFresh, lastUpdateTime, isLoading: oracleLoading, refetch } = useOracle();
+  const { mcr, borrowingFee, redemptionFee, totalDebt, totalCollateral, isLoading: paramsLoading } = useProtocolParams();
 
   // Auto-refresh every 30 seconds
   useEffect(() => {
@@ -22,6 +25,25 @@ export function OracleInfo() {
   return (
     <Card title="System Info" subtitle="Real-time protocol statistics">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {(oracleLoading || paramsLoading) && (
+          <>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+          </>
+        )}
         {/* Oracle Price */}
         <StatCard
           label="wCTC Price"
@@ -46,21 +68,42 @@ export function OracleInfo() {
 
         {/* MCR */}
         <StatCard
-          label="Min. Collateral Ratio"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Min. Collateral Ratio
+              <Tooltip content="Minimum required collateral value relative to debt.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           value={mcr ? formatPercentage(mcr) : '--'}
           subtitle="Required minimum"
         />
 
         {/* Borrowing Fee */}
         <StatCard
-          label="Borrowing Fee"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Borrowing Fee
+              <Tooltip content="Fee charged on newly issued debt.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           value={borrowingFee ? formatPercentage(borrowingFee) : '--'}
           subtitle="On new debt"
         />
 
         {/* Redemption Fee */}
         <StatCard
-          label="Redemption Fee"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Redemption Fee
+              <Tooltip content="Fee deducted from collateral received during redemption.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           value={redemptionFee ? formatPercentage(redemptionFee) : '--'}
           subtitle="On redeemed collateral"
         />
@@ -68,14 +111,14 @@ export function OracleInfo() {
         {/* Total Debt */}
         <StatCard
           label="Total System Debt"
-          value={totalDebt ? `${formatBigInt(totalDebt, 18, 0)} rUSD` : '--'}
+          value={totalDebt ? `${formatCompactBigInt(totalDebt, 18)} crdUSD` : '--'}
           subtitle={totalDebt ? formatUSD(totalDebt) : undefined}
         />
 
         {/* Total Collateral */}
         <StatCard
           label="Total System Collateral"
-          value={totalCollateral ? `${formatBigInt(totalCollateral, 18, 2)} wCTC` : '--'}
+          value={totalCollateral ? `${formatCompactBigInt(totalCollateral, 18)} wCTC` : '--'}
           subtitle={
             totalCollateral && price
               ? formatUSD((totalCollateral * price) / BigInt(1e18))
@@ -85,7 +128,7 @@ export function OracleInfo() {
       </div>
 
       {isFresh === false && (
-        <div className="mt-4 p-3 bg-error/10 border border-error/20 rounded-lg">
+        <div className="mt-4 p-3 bg-error/10 border border-error/20 rounded-xl">
           <p className="text-sm text-error font-medium">⚠️ Oracle price is stale. Transactions may fail.</p>
         </div>
       )}

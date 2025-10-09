@@ -25,6 +25,15 @@ export function formatBigInt(value: bigint, decimals: number = 18, displayDecima
 }
 
 /**
+ * Format a BigInt compactly (e.g., 12.3K, 4.5M)
+ */
+export function formatCompactBigInt(value: bigint, decimals: number = 18): string {
+  const formatted = formatUnits(value, decimals);
+  const num = parseFloat(formatted);
+  return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(num);
+}
+
+/**
  * Parse a string to BigInt
  */
 export function parseToBigInt(value: string, decimals: number = 18): bigint {

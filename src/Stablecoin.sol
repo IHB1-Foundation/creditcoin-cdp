@@ -2,7 +2,7 @@
 pragma solidity 0.8.7;
 
 /**
- * @title Stablecoin (rUSD)
+ * @title Stablecoin (crdUSD)
  * @notice Protocol-controlled stablecoin with restricted minting and burning
  * @dev Only authorized contracts (VaultManager, StabilityPool) can mint/burn
  */
@@ -80,7 +80,7 @@ contract Stablecoin {
     // =============================================================
 
     /**
-     * @notice Mint new rUSD tokens
+     * @notice Mint new crdUSD tokens
      * @param to Address to receive minted tokens
      * @param amount Amount to mint
      * @dev Only callable by authorized minters (e.g., VaultManager)
@@ -96,7 +96,7 @@ contract Stablecoin {
     }
 
     /**
-     * @notice Burn rUSD tokens from an account
+     * @notice Burn crdUSD tokens from an account
      * @param from Address to burn tokens from
      * @param amount Amount to burn
      * @dev Only callable by authorized burners (e.g., VaultManager, StabilityPool)

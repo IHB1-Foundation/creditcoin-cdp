@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Successfully implemented a complete redemption mechanism for the Credit CDP Protocol, allowing rUSD holders to burn their stablecoins in exchange for wCTC collateral from existing vaults. The implementation is fully compatible with London EVM and Solidity 0.8.7.
+Successfully implemented a complete redemption mechanism for the Credit CDP Protocol, allowing crdUSD holders to burn their stablecoins in exchange for wCTC collateral from existing vaults. The implementation is fully compatible with London EVM and Solidity 0.8.7.
 
 **Status**: ✅ Complete and Production-Ready
 **Tests**: 25/25 passing (10 new redemption tests)
@@ -24,7 +24,7 @@ function redeem(uint256 rUSDAmount, address receiver)
 ```
 
 **Features**:
-- Burns rUSD from caller
+- Burns crdUSD from caller
 - Targets vaults with lowest collateral ratio first
 - Skips liquidatable vaults (below MCR)
 - Applies configurable redemption fee (default 0.5%)
@@ -111,7 +111,7 @@ redemptionFee = 5e15; // Default 0.5%
 
 ✅ **testRedemptionSingleVault**
 - Redeems from a single vault
-- Verifies rUSD is burned
+- Verifies crdUSD is burned
 - Confirms wCTC is received (minus fee)
 - Checks vault debt/collateral reduction
 
@@ -238,7 +238,7 @@ redemptionFee = 5e15; // Default 0.5%
 **Reentrancy Protection**:
 - Checks-effects-interactions pattern
 - State updates before external calls
-- Burns rUSD before transferring collateral
+- Burns crdUSD before transferring collateral
 
 **Oracle Dependency**:
 - Uses fresh oracle price
@@ -261,15 +261,15 @@ redemptionFee = 5e15; // Default 0.5%
 // Estimate before redeeming
 const estimated = await vaultManager.getRedeemableAmount(rUSDAmount);
 
-// Approve rUSD
-await rusd.approve(vaultManager.address, rUSDAmount);
+// Approve crdUSD
+await stablecoin.approve(vaultManager.address, rUSDAmount);
 
 // Execute redemption
 const tx = await vaultManager.redeem(rUSDAmount, userAddress);
 
 // Listen to events
 vaultManager.on("RedemptionExecuted", (redeemer, receiver, rUSD, wCTC, fee) => {
-  console.log(`Redeemed ${rUSD} rUSD for ${wCTC} wCTC (fee: ${fee})`);
+  console.log(`Redeemed ${rUSD} crdUSD for ${wCTC} wCTC (fee: ${fee})`);
 });
 ```
 
@@ -284,11 +284,11 @@ vaultManager.on("RedemptionExecuted", (redeemer, receiver, rUSD, wCTC, fee) => {
 
 ## Economic Impact
 
-### For rUSD Holders
+### For crdUSD Holders
 
 **Benefits**:
 - Exit mechanism for large positions
-- Arbitrage opportunity when rUSD < $1
+- Arbitrage opportunity when crdUSD < $1
 - No slippage from AMM pools
 - Direct oracle price execution
 
@@ -531,7 +531,7 @@ The redemption mechanism has been successfully implemented with:
 - ✅ London EVM compatibility
 - ✅ Production-ready code quality
 
-The feature adds a crucial stability mechanism to the Credit CDP Protocol, allowing rUSD holders to exit positions and helping maintain the $1 peg through arbitrage opportunities.
+The feature adds a crucial stability mechanism to the Credit CDP Protocol, allowing crdUSD holders to exit positions and helping maintain the $1 peg through arbitrage opportunities.
 
 **Next Steps**:
 1. Security audit (recommended before mainnet)

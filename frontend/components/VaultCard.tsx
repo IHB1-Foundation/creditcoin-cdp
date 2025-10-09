@@ -5,17 +5,21 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { StatCard } from './ui/StatCard';
+import { Tooltip } from './ui/Tooltip';
+import { InfoIcon } from './ui/InfoIcon';
 import { useAccount } from 'wagmi';
 import { useUserVaults, useVaultData, useOpenVault, useAdjustVault, useCloseVault, useProtocolParams } from '@/hooks/useVault';
+import { Skeleton } from './ui/Skeleton';
 import { useTokenBalances, useAllowances, useApprove, useWrap } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { CONTRACTS, PROTOCOL_PARAMS } from '@/lib/config';
-import { formatBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio } from '@/lib/utils';
+import { HealthBadge } from './ui/HealthBadge';
 import toast from 'react-hot-toast';
 
 export function VaultCard() {
   const { address, isConnected } = useAccount();
-  const { vaultIds, refetch: refetchVaultIds } = useUserVaults();
+  const { vaultIds, isLoading: vaultIdsLoading, refetch: refetchVaultIds } = useUserVaults();
   const { price } = useOracle();
   const { mcr } = useProtocolParams();
 
@@ -31,7 +35,7 @@ export function VaultCard() {
   const [isBorrow, setIsBorrow] = useState(true);
 
   const vaultId = vaultIds?.[selectedVaultIndex];
-  const { vault, collateralRatio, refetch: refetchVault } = useVaultData(vaultId);
+  const { vault, collateralRatio, isLoading: vaultLoading, refetch: refetchVault } = useVaultData(vaultId);
   const { wctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { wctcAllowance, rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.VAULT_MANAGER);
 
@@ -86,7 +90,7 @@ export function VaultCard() {
       }
 
       if (debt < PROTOCOL_PARAMS.MIN_DEBT) {
-        toast.error(`Minimum debt is ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT)} rUSD`);
+        toast.error(`Minimum debt is ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT)} crdUSD`);
         return;
       }
 
@@ -102,6 +106,15 @@ export function VaultCard() {
       // Error handling in hook
     }
   };
+
+  // Projected health for Open Vault form
+  const projectedCollateralOpen = parseToBigInt(collateralAmount);
+  const projectedDebtOpen = parseToBigInt(debtAmount);
+  const projectedRatioOpen =
+    projectedCollateralOpen > BigInt(0) && projectedDebtOpen > BigInt(0) && price
+      ? calculateCollateralRatio(projectedCollateralOpen, projectedDebtOpen, price)
+      : undefined;
+  const projectedHealthOpen = projectedRatioOpen && mcr ? getHealthStatus(projectedRatioOpen, mcr) : null;
 
   const handleAdjustVault = async () => {
     if (!vaultId) return;
@@ -126,7 +139,7 @@ export function VaultCard() {
 
       if (!isBorrow && debtDelta > BigInt(0)) {
         if (rusdAllowance === undefined || rusdAllowance < debtDelta) {
-          toast('Approving rUSD...', { icon: '⏳' });
+          toast('Approving crdUSD...', { icon: '⏳' });
           await approve('rusd', CONTRACTS.VAULT_MANAGER, debtDelta * BigInt(2));
           return;
         }
@@ -145,9 +158,9 @@ export function VaultCard() {
     if (!vaultId || !vault) return;
 
     try {
-      // Check rUSD approval
+      // Check crdUSD approval
       if (rusdAllowance === undefined || rusdAllowance < vault.debt) {
-        toast('Approving rUSD...', { icon: '⏳' });
+        toast('Approving crdUSD...', { icon: '⏳' });
         await approve('rusd', CONTRACTS.VAULT_MANAGER, vault.debt * BigInt(2));
         return;
       }
@@ -186,14 +199,16 @@ export function VaultCard() {
   const healthStatus = vault && collateralRatio && mcr ? getHealthStatus(collateralRatio, mcr) : null;
   const liquidationPrice = vault && mcr && price ? calculateLiquidationPrice(vault.collateral, vault.debt, mcr) : undefined;
 
+  const vaultsSubtitle = vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet';
+
   return (
-    <Card title="My Vaults" subtitle={vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet'}>
+    <Card title="My Vaults" subtitle={vaultsSubtitle}>
       {/* Vault Selector */}
       {vaultIds && vaultIds.length > 0 && (
-        <div className="mb-6 flex items-center space-x-2">
-          <label className="text-sm font-medium text-gray-700">Select Vault:</label>
+        <div className="mb-6">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Select Vault</p>
           <select
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500"
+            className="px-3 py-2 border border-gray-200 rounded-xl bg-white focus:ring-2 focus:ring-primary-500"
             value={selectedVaultIndex}
             onChange={(e) => setSelectedVaultIndex(Number(e.target.value))}
           >
@@ -207,29 +222,69 @@ export function VaultCard() {
       )}
 
       {/* Vault Stats */}
-      {vault && vaultId !== undefined && (
+      {(vaultLoading || vaultIdsLoading) && (
+        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+            <Skeleton className="h-3 w-24 mb-3 rounded" />
+            <Skeleton className="h-6 w-20 mb-2 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+          <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+            <Skeleton className="h-3 w-24 mb-3 rounded" />
+            <Skeleton className="h-6 w-20 mb-2 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+          <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+            <Skeleton className="h-3 w-24 mb-3 rounded" />
+            <Skeleton className="h-6 w-20 mb-2 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+          <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+            <Skeleton className="h-3 w-24 mb-3 rounded" />
+            <Skeleton className="h-6 w-20 mb-2 rounded" />
+            <Skeleton className="h-3 w-24 rounded" />
+          </div>
+        </div>
+      )}
+      {vault && vaultId !== undefined && !vaultLoading && (
         <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard
             label="Collateral"
-            value={`${formatBigInt(vault.collateral)} wCTC`}
+            value={`${formatCompactBigInt(vault.collateral)} wCTC`}
             subtitle={price ? formatUSD((vault.collateral * price) / PROTOCOL_PARAMS.PRECISION) : undefined}
           />
           <StatCard
             label="Debt"
-            value={`${formatBigInt(vault.debt, 18, 2)} rUSD`}
+            value={`${formatCompactBigInt(vault.debt, 18)} crdUSD`}
             subtitle={formatUSD(vault.debt)}
           />
           <StatCard
-            label="Health Factor"
-            value={
-              <span className={healthStatus?.color}>
-                {collateralRatio ? formatPercentage(collateralRatio) : '--'}
+            label={
+              <span className="inline-flex items-center gap-1">
+                Health Factor
+                <Tooltip content="Collateral value divided by debt (higher is safer).">
+                  <span><InfoIcon /></span>
+                </Tooltip>
               </span>
             }
-            subtitle={healthStatus?.label}
+            value={
+              <span className="inline-flex items-center">
+                <span className={healthStatus?.color}>
+                  {collateralRatio ? formatPercentage(collateralRatio) : '--'}
+                </span>
+                <HealthBadge ratio={collateralRatio} mcr={mcr} />
+              </span>
+            }
           />
           <StatCard
-            label="Liquidation Price"
+            label={
+              <span className="inline-flex items-center gap-1">
+                Liquidation Price
+                <Tooltip content="wCTC price at which your vault reaches the minimum ratio.">
+                  <span><InfoIcon /></span>
+                </Tooltip>
+              </span>
+            }
             value={liquidationPrice ? formatUSD(liquidationPrice) : '--'}
             subtitle="Per wCTC"
           />
@@ -237,7 +292,10 @@ export function VaultCard() {
       )}
 
       {/* Mode Selector */}
-      <div className="mb-6 flex space-x-2 border-b border-gray-200">
+      <div className="mb-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Actions</p>
+      </div>
+      <div className="mb-6 flex space-x-2 border-b border-gray-100">
         <button
           className={`px-4 py-2 font-medium transition-colors ${
             mode === 'open'
@@ -276,7 +334,7 @@ export function VaultCard() {
 
       {/* Open Vault Form */}
       {mode === 'open' && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           <Input
             type="number"
             label="Collateral Amount (wCTC)"
@@ -292,20 +350,31 @@ export function VaultCard() {
               </button>
             }
           />
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Available: {wctcBalance ? formatBigInt(wctcBalance) : '--'} wCTC</span>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-500">Available: <span className="font-medium text-gray-700">{wctcBalance ? formatBigInt(wctcBalance) : '--'}</span> wCTC</span>
             <Button size="sm" variant="secondary" onClick={handleWrap} isLoading={isWrapping}>
               Wrap tCTC
             </Button>
           </div>
 
-          <Input
-            type="number"
-            label="Borrow Amount (rUSD)"
-            placeholder="0.0"
-            value={debtAmount}
-            onChange={(e) => setDebtAmount(e.target.value)}
-          />
+      <Input
+        type="number"
+        label="Borrow Amount (crdUSD)"
+        placeholder="0.0"
+        value={debtAmount}
+        onChange={(e) => setDebtAmount(e.target.value)}
+      />
+
+          {/* Projected health preview */}
+          {price && mcr && projectedRatioOpen !== undefined && projectedRatioOpen > BigInt(0) && (
+            <div className="-mt-1 text-sm text-gray-600">
+              <span className="mr-2">Projected ratio</span>
+              <span className={projectedHealthOpen?.color}>
+                {formatPercentage(projectedRatioOpen)}
+              </span>
+              <span className="ml-2 text-xs text-gray-500">(min {formatPercentage(mcr)})</span>
+            </div>
+          )}
 
           <Button
             className="w-full"
@@ -318,8 +387,8 @@ export function VaultCard() {
       )}
 
       {/* Adjust Vault Form */}
-      {mode === 'adjust' && vault && (
-        <div className="space-y-4">
+      {mode === 'adjust' && vault && !vaultLoading && (
+        <div className="space-y-3">
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700">Collateral</label>
@@ -378,6 +447,29 @@ export function VaultCard() {
               value={debtDelta}
               onChange={(e) => setDebtDelta(e.target.value)}
             />
+
+            {/* Projected health after adjustment */}
+            {
+              (() => {
+                if (!vault || !price || !mcr) return null;
+                const collatDeltaBI = parseToBigInt(collateralDelta);
+                const debtDeltaBI = parseToBigInt(debtDelta);
+                const newCollateral = isDeposit ? (vault.collateral + collatDeltaBI) : (vault.collateral - collatDeltaBI);
+                const newDebt = isBorrow ? (vault.debt + debtDeltaBI) : (vault.debt - debtDeltaBI);
+                if (newCollateral >= BigInt(0) && newDebt > BigInt(0)) {
+                  const ratio = calculateCollateralRatio(newCollateral, newDebt, price);
+                  const health = getHealthStatus(ratio, mcr);
+                  return (
+                    <div className="mt-2 text-sm text-gray-600">
+                      <span className="mr-2">Projected ratio:</span>
+                      <span className={health.color}>{formatPercentage(ratio)}</span>
+                      <span className="ml-2 text-xs text-gray-500">(min {formatPercentage(mcr)})</span>
+                    </div>
+                  );
+                }
+                return null;
+              })()
+            }
           </div>
 
           <Button
@@ -391,22 +483,22 @@ export function VaultCard() {
       )}
 
       {/* Close Vault Form */}
-      {mode === 'close' && vault && (
+      {mode === 'close' && vault && !vaultLoading && (
         <div className="space-y-4">
-          <div className="p-4 bg-warning/10 border border-warning/20 rounded-lg">
+          <div className="p-4 bg-warning/10 border border-warning/20 rounded-xl">
             <p className="text-sm text-warning font-medium">
-              Closing this vault will repay all debt ({formatBigInt(vault.debt, 18, 2)} rUSD) and return all collateral ({formatBigInt(vault.collateral)} wCTC).
+              Closing this vault will repay all debt ({formatBigInt(vault.debt, 18, 2)} crdUSD) and return all collateral ({formatBigInt(vault.collateral)} wCTC).
             </p>
           </div>
 
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
-              <span className="text-gray-600">rUSD to repay:</span>
-              <span className="font-semibold">{formatBigInt(vault.debt, 18, 2)} rUSD</span>
+              <span className="text-gray-600">crdUSD to repay:</span>
+              <span className="font-semibold">{formatBigInt(vault.debt, 18, 2)} crdUSD</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-gray-600">Your rUSD balance:</span>
-              <span className="font-semibold">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'} rUSD</span>
+              <span className="text-gray-600">Your crdUSD balance:</span>
+              <span className="font-semibold">{rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'} crdUSD</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">wCTC to receive:</span>
@@ -415,9 +507,9 @@ export function VaultCard() {
           </div>
 
           {rusdBalance && rusdBalance < vault.debt && (
-            <div className="p-3 bg-error/10 border border-error/20 rounded-lg">
+            <div className="p-3 bg-error/10 border border-error/20 rounded-xl">
               <p className="text-sm text-error">
-                Insufficient rUSD balance. Need {formatBigInt(vault.debt - rusdBalance, 18, 2)} more rUSD.
+                Insufficient crdUSD balance. Need {formatBigInt(vault.debt - rusdBalance, 18, 2)} more crdUSD.
               </p>
             </div>
           )}

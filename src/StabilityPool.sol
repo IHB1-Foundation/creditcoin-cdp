@@ -5,8 +5,8 @@ import "./interfaces/IInterfaces.sol";
 
 /**
  * @title StabilityPool
- * @notice Accepts rUSD deposits to absorb liquidated debt and earn discounted collateral
- * @dev Depositors provide rUSD which is burned during liquidations in exchange for wCTC
+ * @notice Accepts crdUSD deposits to absorb liquidated debt and earn discounted collateral
+ * @dev Depositors provide crdUSD which is burned during liquidations in exchange for wCTC
  */
 contract StabilityPool {
     // =============================================================
@@ -14,7 +14,7 @@ contract StabilityPool {
     // =============================================================
 
     struct Deposit {
-        uint256 amount;                    // rUSD deposited
+        uint256 amount;                    // crdUSD deposited
         uint256 collateralGainSnapshot;    // Collateral gain at last interaction
         uint256 epochSnapshot;             // Epoch at last interaction
     }
@@ -22,7 +22,7 @@ contract StabilityPool {
     uint256 private constant PRECISION = 1e18;
 
     // Contract references
-    IStablecoin public immutable stablecoin;    // rUSD
+    IStablecoin public immutable stablecoin;    // crdUSD
     IERC20 public immutable collateralToken;    // wCTC
 
     // State
@@ -65,7 +65,7 @@ contract StabilityPool {
 
     /**
      * @notice Initialize the StabilityPool
-     * @param _stablecoin rUSD token address
+     * @param _stablecoin crdUSD token address
      * @param _collateralToken wCTC token address
      */
     constructor(address _stablecoin, address _collateralToken) {
@@ -96,8 +96,8 @@ contract StabilityPool {
     // =============================================================
 
     /**
-     * @notice Deposit rUSD into the stability pool
-     * @param amount Amount of rUSD to deposit
+     * @notice Deposit crdUSD into the stability pool
+     * @param amount Amount of crdUSD to deposit
      */
     function deposit(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
@@ -105,7 +105,7 @@ contract StabilityPool {
         // Update depositor gains before modifying deposit
         _updateDepositorGains(msg.sender);
 
-        // Transfer rUSD from user
+        // Transfer crdUSD from user
         (bool success, bytes memory data) = address(stablecoin).call(
             abi.encodeWithSignature("transferFrom(address,address,uint256)", msg.sender, address(this), amount)
         );
@@ -121,8 +121,8 @@ contract StabilityPool {
     }
 
     /**
-     * @notice Withdraw rUSD from the stability pool
-     * @param amount Amount of rUSD to withdraw
+     * @notice Withdraw crdUSD from the stability pool
+     * @param amount Amount of crdUSD to withdraw
      */
     function withdraw(uint256 amount) external {
         if (amount == 0) revert ZeroAmount();
@@ -135,7 +135,7 @@ contract StabilityPool {
         deposits[msg.sender].amount -= amount;
         totalDeposits -= amount;
 
-        // Transfer rUSD to user
+        // Transfer crdUSD to user
         (bool success, bytes memory data) = address(stablecoin).call(
             abi.encodeWithSignature("transfer(address,uint256)", msg.sender, amount)
         );
@@ -185,7 +185,7 @@ contract StabilityPool {
         if (debtAmount == 0) revert ZeroAmount();
         if (totalDeposits < debtAmount) revert InsufficientPoolBalance();
 
-        // Burn rUSD from the pool
+        // Burn crdUSD from the pool
         stablecoin.burn(address(this), debtAmount);
         totalDeposits -= debtAmount;
 
@@ -207,7 +207,7 @@ contract StabilityPool {
     /**
      * @notice Get depositor information
      * @param depositor Address of the depositor
-     * @return depositAmount Amount of rUSD deposited
+     * @return depositAmount Amount of crdUSD deposited
      * @return collateralGain Accumulated collateral gains
      */
     function getDepositorInfo(address depositor)
@@ -229,15 +229,15 @@ contract StabilityPool {
     }
 
     /**
-     * @notice Get the total rUSD in the stability pool
-     * @return total Total rUSD deposited
+     * @notice Get the total crdUSD in the stability pool
+     * @return total Total crdUSD deposited
      */
     function getTotalDeposits() external view returns (uint256 total) {
         return totalDeposits;
     }
 
     /**
-     * @notice Check if pool has sufficient rUSD to absorb debt
+     * @notice Check if pool has sufficient crdUSD to absorb debt
      * @param debtAmount Amount of debt to check
      * @return sufficient True if pool can absorb the debt
      */

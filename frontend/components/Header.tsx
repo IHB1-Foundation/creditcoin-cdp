@@ -13,22 +13,22 @@ export function Header() {
   const { wctcBalance, rusdBalance } = useTokenBalances();
 
   return (
-    <header className="bg-white border-b border-gray-200 shadow-sm">
-      <div className="container mx-auto px-4 py-4">
+    <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-gray-200/80 shadow-sm">
+      <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center shadow-sm">
               <span className="text-white font-bold text-xl">C</span>
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Credit CDP</h1>
+              <h1 className="text-xl font-semibold text-gray-900">Credit CDP</h1>
               <p className="text-xs text-gray-500">CreditCoin Testnet</p>
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
             {isConnected && address && (
-              <div className="hidden md:flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-lg">
+              <div className="hidden md:flex items-center space-x-4 px-4 py-2 bg-gray-50 rounded-lg border border-gray-200">
                 <div className="text-right">
                   <p className="text-xs text-gray-500">wCTC</p>
                   <p className="text-sm font-semibold text-gray-900">
@@ -37,7 +37,7 @@ export function Header() {
                 </div>
                 <div className="w-px h-8 bg-gray-300" />
                 <div className="text-right">
-                  <p className="text-xs text-gray-500">rUSD</p>
+                  <p className="text-xs text-gray-500">crdUSD</p>
                   <p className="text-sm font-semibold text-gray-900">
                     {rusdBalance !== undefined ? formatBigInt(rusdBalance, 18, 2) : '--'}
                   </p>
@@ -47,7 +47,7 @@ export function Header() {
 
             {isConnected && address ? (
               <div className="flex items-center space-x-2">
-                <div className="px-3 py-2 bg-primary-50 rounded-lg">
+                <div className="px-3 py-2 bg-primary-50 rounded-lg border border-primary-100">
                   <p className="text-sm font-medium text-primary-700">{shortenAddress(address)}</p>
                 </div>
                 <Button variant="secondary" size="sm" onClick={() => disconnect()}>

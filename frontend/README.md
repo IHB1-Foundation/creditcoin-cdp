@@ -5,8 +5,8 @@ A modern, minimal, and fully functional frontend for the Credit CDP Protocol bui
 ## Features
 
 - ✅ **Vault Management**: Open, adjust, and close collateralized vaults
-- ✅ **Stability Pool**: Deposit rUSD and earn liquidation rewards
-- ✅ **Redemption**: Burn rUSD to receive wCTC at oracle price
+- ✅ **Stability Pool**: Deposit crdUSD and earn liquidation rewards
+- ✅ **Redemption**: Burn crdUSD to receive wCTC at oracle price
 - ✅ **Real-time Data**: Direct contract reads, no subgraph needed
 - ✅ **Wallet Integration**: MetaMask support via Wagmi
 - ✅ **Responsive Design**: Mobile-friendly TailwindCSS UI
@@ -160,7 +160,7 @@ Before opening a vault, you need wCTC collateral:
 
 1. Navigate to the "Open Vault" tab
 2. Enter collateral amount (wCTC)
-3. Enter debt amount (rUSD to borrow)
+3. Enter debt amount (crdUSD to borrow)
 4. Click "Open Vault"
 5. Approve wCTC if needed (first time)
 6. Confirm the transaction
@@ -177,18 +177,18 @@ Before opening a vault, you need wCTC collateral:
 
 1. Navigate to the Stability Pool card
 2. Click "Deposit" tab
-3. Enter rUSD amount
+3. Enter crdUSD amount
 4. Click "Deposit"
-5. Approve rUSD if needed
+5. Approve crdUSD if needed
 6. Claim wCTC gains when available
 
-### 6. Redeem rUSD for wCTC
+### 6. Redeem crdUSD for wCTC
 
 1. Navigate to the Redemption card
-2. Enter rUSD amount to redeem
+2. Enter crdUSD amount to redeem
 3. Review the estimated wCTC you'll receive
 4. Click "Redeem"
-5. Approve rUSD if needed
+5. Approve crdUSD if needed
 6. Confirm the transaction
 
 ## Key Features Explained
@@ -197,7 +197,7 @@ Before opening a vault, you need wCTC collateral:
 
 - **Health Factor**: Shows your collateral ratio (green = safe, yellow = at risk, red = liquidatable)
 - **Liquidation Price**: The wCTC price at which your vault becomes liquidatable
-- **Minimum Debt**: 100 rUSD minimum to open/maintain a vault
+- **Minimum Debt**: 100 crdUSD minimum to open/maintain a vault
 
 ### Stability Pool
 
@@ -234,7 +234,7 @@ You don't have enough tokens or native currency for gas fees.
 Update these in your `.env.local` file after deployment:
 
 - **WCTC**: Wrapped tCTC token
-- **RUSD**: rUSD stablecoin
+- **Stablecoin**: crdUSD token
 - **VaultManager**: Main vault operations
 - **StabilityPool**: Stability pool contract
 - **LiquidationEngine**: Liquidation logic

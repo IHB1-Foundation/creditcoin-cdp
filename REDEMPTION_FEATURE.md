@@ -2,13 +2,13 @@
 
 ## Overview
 
-The redemption mechanism allows rUSD holders to burn their stablecoins in exchange for wCTC collateral from existing vaults at oracle price, providing a crucial stability mechanism for the protocol.
+The redemption mechanism allows crdUSD holders to burn their stablecoins in exchange for wCTC collateral from existing vaults at oracle price, providing a crucial stability mechanism for the protocol.
 
 ## How Redemptions Work
 
 ### Basic Flow
 
-1. **User burns rUSD**: The redeemer burns rUSD stablecoins from their balance
+1. **User burns crdUSD**: The redeemer burns crdUSD stablecoins from their balance
 2. **Vault targeting**: Protocol identifies vaults with the lowest collateral ratio (CR)
 3. **Collateral extraction**: Proportional wCTC collateral is removed from targeted vaults
 4. **Fee application**: A redemption fee (default 0.5%) is applied on the collateral
@@ -29,7 +29,7 @@ Redemptions target vaults in ascending order of collateral ratio:
 - Vault B: 15 wCTC collateral, $16,080 debt → CR = 186%
 - Redemption fee: 0.5%
 
-**User redeems 5,000 rUSD**:
+**User redeems 5,000 crdUSD**:
 1. Protocol targets Vault A (lowest CR)
 2. Calculates collateral needed: 5,000 / 2,000 = 2.5 wCTC
 3. Applies fee: 2.5 * 0.5% = 0.0125 wCTC fee
@@ -48,7 +48,7 @@ function redeem(uint256 rUSDAmount, address receiver)
 ```
 
 **Parameters**:
-- `rUSDAmount`: Amount of rUSD to burn for redemption
+- `rUSDAmount`: Amount of crdUSD to burn for redemption
 - `receiver`: Address to receive the redeemed wCTC
 
 **Returns**:
@@ -69,7 +69,7 @@ function getRedeemableAmount(uint256 rUSDAmount)
     returns (uint256 estimatedCollateral)
 ```
 
-Returns estimated wCTC the user will receive (after fee) for a given rUSD redemption amount.
+Returns estimated wCTC the user will receive (after fee) for a given crdUSD redemption amount.
 
 #### Calculate Redemption Fee
 
@@ -94,7 +94,7 @@ Updates the redemption fee percentage (max 10%).
 
 ### 1. Vault Closure on Low Debt
 
-If redemption reduces a vault's debt below `MIN_DEBT` (100 rUSD):
+If redemption reduces a vault's debt below `MIN_DEBT` (100 crdUSD):
 - The vault is automatically closed
 - Remaining collateral is returned to the vault owner
 - `VaultClosed` event is emitted
@@ -114,7 +114,7 @@ If no healthy vaults exist or redemption amount is too large:
 
 ### 4. Zero Amount/Address Validation
 
-- Reverts on zero rUSD amount: `ZeroAmount` error
+- Reverts on zero crdUSD amount: `ZeroAmount` error
 - Reverts on zero receiver address: `ZeroAddress` error
 
 ## Economic Impact
@@ -122,8 +122,8 @@ If no healthy vaults exist or redemption amount is too large:
 ### For Redeemers
 
 **Benefits**:
-- Arbitrage opportunity when rUSD trades below peg
-- Exit mechanism for large rUSD holders
+- Arbitrage opportunity when crdUSD trades below peg
+- Exit mechanism for large crdUSD holders
 - Price-efficient collateral acquisition
 
 **Costs**:
@@ -156,7 +156,7 @@ If no healthy vaults exist or redemption amount is too large:
 | Parameter | Default Value | Range | Description |
 |-----------|--------------|-------|-------------|
 | `redemptionFee` | 0.5% (5e15) | 0-10% | Fee on redeemed collateral |
-| `MIN_DEBT` | 100 rUSD | Fixed | Minimum vault debt threshold |
+| `MIN_DEBT` | 100 crdUSD | Fixed | Minimum vault debt threshold |
 | `MCR` | 130% (1.3e18) | >100% | Minimum Collateral Ratio |
 
 ## Integration Examples
@@ -164,10 +164,10 @@ If no healthy vaults exist or redemption amount is too large:
 ### Basic Redemption
 
 ```solidity
-// User wants to redeem 10,000 rUSD for wCTC
+// User wants to redeem 10,000 crdUSD for wCTC
 uint256 redemptionAmount = 10_000e18;
 
-// Approve VaultManager to burn rUSD
+// Approve VaultManager to burn crdUSD
 rusd.approve(address(vaultManager), redemptionAmount);
 
 // Perform redemption
@@ -231,7 +231,7 @@ All tests pass with Solidity 0.8.7 and London EVM compatibility.
 
 - Uses checks-effects-interactions pattern
 - State updates before external calls
-- Burns rUSD before transferring collateral
+- Burns crdUSD before transferring collateral
 
 ### Price Oracle Dependency
 

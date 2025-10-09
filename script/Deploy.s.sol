@@ -4,7 +4,7 @@ pragma solidity 0.8.7;
 import "forge-std/Script.sol";
 import "../src/WCTC.sol";
 import "../src/Stablecoin.sol";
-import "../src/PushOracle.sol";
+import "../src/MockOracle.sol";
 import "../src/Treasury.sol";
 import "../src/VaultManager.sol";
 import "../src/StabilityPool.sol";
@@ -26,7 +26,7 @@ contract DeployScript is Script {
     // Deployed contracts
     WCTC public wctc;
     Stablecoin public stablecoin;
-    PushOracle public oracle;
+    MockOracle public oracle;
     Treasury public treasury;
     VaultManager public vaultManager;
     StabilityPool public stabilityPool;
@@ -52,10 +52,10 @@ contract DeployScript is Script {
         console.log("  WCTC deployed at:", address(wctc));
 
         stablecoin = new Stablecoin();
-        console.log("  Stablecoin (rUSD) deployed at:", address(stablecoin));
+        console.log("  Stablecoin (crdUSD) deployed at:", address(stablecoin));
 
-        oracle = new PushOracle(STALENESS_THRESHOLD, INITIAL_PRICE);
-        console.log("  Oracle deployed at:", address(oracle));
+        oracle = new MockOracle();
+        console.log("  Oracle (Mock) deployed at:", address(oracle));
 
         treasury = new Treasury();
         console.log("  Treasury deployed at:", address(treasury));
@@ -115,8 +115,8 @@ contract DeployScript is Script {
         console.log("Deployment Summary");
         console.log("==============================================");
         console.log("WCTC:", address(wctc));
-        console.log("Stablecoin (rUSD):", address(stablecoin));
-        console.log("Oracle:", address(oracle));
+        console.log("Stablecoin (crdUSD):", address(stablecoin));
+        console.log("Oracle (Mock):", address(oracle));
         console.log("Treasury:", address(treasury));
         console.log("VaultManager:", address(vaultManager));
         console.log("StabilityPool:", address(stabilityPool));
@@ -128,7 +128,7 @@ contract DeployScript is Script {
         console.log("  MCR: %s%%", (MCR * 100) / 1e18);
         console.log("  Borrowing Fee: %s%%", (BORROWING_FEE * 100) / 1e18);
         console.log("  Liquidation Penalty: %s%%", (LIQUIDATION_PENALTY * 100) / 1e18);
-        console.log("  Oracle Staleness: %s seconds", STALENESS_THRESHOLD);
+        // MockOracle has no staleness; values vary deterministically in [$0.52,$0.58]
         console.log("==============================================");
         console.log("");
         console.log("Next Steps:");

@@ -10,10 +10,10 @@ interface CardProps {
 
 export function Card({ children, className, title, subtitle }: CardProps) {
   return (
-    <div className={cn('bg-white rounded-xl shadow-lg border border-gray-200', className)}>
+    <div className={cn('bg-white/90 backdrop-blur rounded-xl card-shadow border border-gray-200 hover:border-primary-200 transition-colors', className)}>
       {(title || subtitle) && (
-        <div className="px-6 py-4 border-b border-gray-200">
-          {title && <h2 className="text-2xl font-bold text-gray-900">{title}</h2>}
+        <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white to-gray-50 rounded-t-xl">
+          {title && <h2 className="text-xl font-semibold text-gray-900">{title}</h2>}
           {subtitle && <p className="text-sm text-gray-600 mt-1">{subtitle}</p>}
         </div>
       )}

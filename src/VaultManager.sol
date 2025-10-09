@@ -6,7 +6,7 @@ import "./interfaces/IInterfaces.sol";
 /**
  * @title VaultManager
  * @notice Core CDP logic for creating and managing collateralized debt positions
- * @dev Allows users to deposit wCTC collateral and borrow rUSD against it
+ * @dev Allows users to deposit wCTC collateral and borrow crdUSD against it
  */
 contract VaultManager {
     // =============================================================
@@ -16,17 +16,17 @@ contract VaultManager {
     struct Vault {
         address owner;
         uint256 collateral; // wCTC amount
-        uint256 debt;       // rUSD amount
+        uint256 debt;       // crdUSD amount
         uint256 timestamp;  // Last update time
     }
 
     // Constants with 18 decimals precision
     uint256 private constant PRECISION = 1e18;
-    uint256 private constant MIN_DEBT = 100e18; // Minimum 100 rUSD debt
+    uint256 private constant MIN_DEBT = 100e18; // Minimum 100 crdUSD debt
 
     // Contract references
     IERC20 public immutable collateralToken;    // wCTC
-    IStablecoin public immutable stablecoin;    // rUSD
+    IStablecoin public immutable stablecoin;    // crdUSD
     IPushOracle public immutable oracle;        // Price oracle
     ITreasury public immutable treasury;        // Fee collection
 
@@ -103,7 +103,7 @@ contract VaultManager {
     /**
      * @notice Initialize the VaultManager
      * @param _collateralToken wCTC token address
-     * @param _stablecoin rUSD token address
+     * @param _stablecoin crdUSD token address
      * @param _oracle Price oracle address
      * @param _treasury Treasury address
      * @param _minCollateralRatio Minimum collateral ratio (e.g., 1.3e18 = 130%)
@@ -168,7 +168,7 @@ contract VaultManager {
     /**
      * @notice Open a new vault with collateral and debt
      * @param collateralAmount Amount of wCTC to deposit
-     * @param debtAmount Amount of rUSD to borrow
+     * @param debtAmount Amount of crdUSD to borrow
      * @return vaultId ID of the newly created vault
      */
     function openVault(uint256 collateralAmount, uint256 debtAmount)
@@ -211,7 +211,7 @@ contract VaultManager {
             revert TransferFailed();
         }
 
-        // Mint rUSD to user (only the requested amount, not the fee)
+        // Mint crdUSD to user (only the requested amount, not the fee)
         stablecoin.mint(msg.sender, debtAmount);
 
         // Mint fee to treasury
@@ -337,9 +337,9 @@ contract VaultManager {
     // =============================================================
 
     /**
-     * @notice Redeem rUSD for wCTC collateral from the riskiest vaults
+     * @notice Redeem crdUSD for wCTC collateral from the riskiest vaults
      * @dev Targets vaults with lowest collateral ratio first
-     * @param rUSDAmount Amount of rUSD to burn for redemption
+     * @param rUSDAmount Amount of crdUSD to burn for redemption
      * @param receiver Address to receive the redeemed wCTC
      * @return collateralRedeemed Total amount of wCTC sent to receiver (after fee)
      */
@@ -424,7 +424,7 @@ contract VaultManager {
         uint256 fee = (totalCollateralRedeemed * redemptionFee) / PRECISION;
         uint256 collateralToReceiver = totalCollateralRedeemed - fee;
 
-        // Burn rUSD from caller
+        // Burn crdUSD from caller
         uint256 actualBurned = rUSDAmount - remainingDebt;
         stablecoin.burn(msg.sender, actualBurned);
 
@@ -446,8 +446,8 @@ contract VaultManager {
     }
 
     /**
-     * @notice Get estimated collateral amount for a given rUSD redemption
-     * @param rUSDAmount Amount of rUSD to redeem
+     * @notice Get estimated collateral amount for a given crdUSD redemption
+     * @param rUSDAmount Amount of crdUSD to redeem
      * @return estimatedCollateral Estimated wCTC to receive (after fee)
      */
     function getRedeemableAmount(uint256 rUSDAmount)

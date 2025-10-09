@@ -84,7 +84,7 @@ frontend/
 
 - ✅ MetaMask connection via Wagmi injected connector
 - ✅ Display connected address (shortened)
-- ✅ Show real-time wCTC and rUSD balances
+- ✅ Show real-time wCTC and crdUSD balances
 - ✅ Disconnect functionality
 - ✅ Responsive design (mobile-friendly)
 
@@ -103,26 +103,26 @@ useTokenBalances() // Display balances
 **File**: `components/VaultCard.tsx` (480 lines)
 
 #### Open Vault
-- ✅ Input collateral (wCTC) and debt (rUSD)
+- ✅ Input collateral (wCTC) and debt (crdUSD)
 - ✅ Show available balance
 - ✅ MAX button for convenience
 - ✅ Wrap tCTC → wCTC directly in UI
 - ✅ Auto-approval flow for wCTC
-- ✅ Validate minimum debt (100 rUSD)
+- ✅ Validate minimum debt (100 crdUSD)
 - ✅ Real-time collateral ratio preview
 
 #### Adjust Vault
 - ✅ Select from user's vaults (dropdown)
 - ✅ Deposit/Withdraw collateral toggle
 - ✅ Borrow/Repay debt toggle
-- ✅ Auto-approval for wCTC/rUSD as needed
+- ✅ Auto-approval for wCTC/crdUSD as needed
 - ✅ Live vault statistics display
 
 #### Close Vault
 - ✅ Show total debt to repay
 - ✅ Show collateral to receive
 - ✅ Balance check warnings
-- ✅ Auto-approval for rUSD
+- ✅ Auto-approval for crdUSD
 - ✅ Confirmation with details
 
 #### Vault Display
@@ -151,8 +151,8 @@ useProtocolParams()      // Get MCR, fees, etc.
 
 **File**: `components/StabilityPoolCard.tsx`
 
-- ✅ Deposit rUSD to pool
-- ✅ Withdraw rUSD from pool
+- ✅ Deposit crdUSD to pool
+- ✅ Withdraw crdUSD from pool
 - ✅ Claim wCTC collateral gains
 - ✅ Show individual deposit amount
 - ✅ Show pool share percentage
@@ -181,7 +181,7 @@ useClaimCollateralGain()    // Claim wCTC rewards
 
 **File**: `components/RedemptionCard.tsx`
 
-- ✅ Input rUSD amount to redeem
+- ✅ Input crdUSD amount to redeem
 - ✅ Real-time estimate of wCTC to receive
 - ✅ Show gross collateral before fee
 - ✅ Display redemption fee breakdown
@@ -530,8 +530,8 @@ export const config = createConfig({
 - [ ] Health factor updates
 
 ### Stability Pool
-- [ ] Deposit rUSD
-- [ ] Withdraw rUSD
+- [ ] Deposit crdUSD
+- [ ] Withdraw crdUSD
 - [ ] Claim collateral gains
 - [ ] Pool share calculation
 

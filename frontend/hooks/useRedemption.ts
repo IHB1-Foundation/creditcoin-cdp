@@ -54,7 +54,7 @@ export function useRedemptionEstimate(rUSDAmount: bigint | undefined) {
 }
 
 /**
- * Hook to redeem rUSD
+ * Hook to redeem crdUSD
  */
 export function useRedeem() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();

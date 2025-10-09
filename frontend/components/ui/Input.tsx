@@ -18,7 +18,7 @@ export function Input({ label, error, rightElement, className, ...props }: Input
       <div className="relative">
         <input
           className={cn(
-            'w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors',
+            'w-full px-4 py-2 border border-gray-200 rounded-xl bg-white placeholder:text-gray-400 focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors',
             error && 'border-error focus:ring-error focus:border-error',
             rightElement && 'pr-24',
             className

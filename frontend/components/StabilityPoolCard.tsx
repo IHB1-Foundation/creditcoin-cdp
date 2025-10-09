@@ -9,12 +9,13 @@ import { useAccount } from 'wagmi';
 import { useStabilityPoolData, useStabilityDeposit, useStabilityWithdraw, useClaimCollateralGain } from '@/hooks/useStabilityPool';
 import { useTokenBalances, useAllowances, useApprove } from '@/hooks/useTokens';
 import { CONTRACTS } from '@/lib/config';
-import { formatBigInt, parseToBigInt } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, parseToBigInt } from '@/lib/utils';
+import { Skeleton } from './ui/Skeleton';
 import toast from 'react-hot-toast';
 
 export function StabilityPoolCard() {
   const { isConnected } = useAccount();
-  const { depositAmount, collateralGain, totalDeposits, refetch: refetchPool } = useStabilityPoolData();
+  const { depositAmount, collateralGain, totalDeposits, isLoading: poolLoading, refetch: refetchPool } = useStabilityPoolData();
   const { rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.STABILITY_POOL);
 
@@ -66,13 +67,13 @@ export function StabilityPoolCard() {
       }
 
       if (rusdBalance !== undefined && depositAmt > rusdBalance) {
-        toast.error('Insufficient rUSD balance');
+        toast.error('Insufficient crdUSD balance');
         return;
       }
 
       // Check approval
       if (rusdAllowance === undefined || rusdAllowance < depositAmt) {
-        toast('Approving rUSD...', { icon: '⏳' });
+        toast('Approving crdUSD...', { icon: '⏳' });
         await approve('rusd', CONTRACTS.STABILITY_POOL, depositAmt * BigInt(2));
         return;
       }
@@ -132,11 +133,30 @@ export function StabilityPoolCard() {
 
   return (
     <Card title="Stability Pool" subtitle="Earn wCTC from liquidations">
-      {/* Stats */}
+      {/* Your Position */}
       <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {poolLoading && (
+          <>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+            <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
+              <Skeleton className="h-3 w-32 mb-3 rounded" />
+              <Skeleton className="h-6 w-24 mb-2 rounded" />
+              <Skeleton className="h-3 w-28 rounded" />
+            </div>
+          </>
+        )}
         <StatCard
           label="Your Deposit"
-          value={depositAmount !== undefined ? `${formatBigInt(depositAmount, 18, 2)} rUSD` : '--'}
+          value={depositAmount !== undefined ? `${formatCompactBigInt(depositAmount, 18)} crdUSD` : '--'}
           subtitle={poolShare > BigInt(0) ? `${Number(poolShare) / 100}% of pool` : undefined}
         />
         <StatCard
@@ -146,7 +166,7 @@ export function StabilityPoolCard() {
         />
         <StatCard
           label="Total Pool Size"
-          value={totalDeposits !== undefined ? `${formatBigInt(totalDeposits, 18, 0)} rUSD` : '--'}
+          value={totalDeposits !== undefined ? `${formatCompactBigInt(totalDeposits, 18)} crdUSD` : '--'}
         />
       </div>
 
@@ -164,8 +184,13 @@ export function StabilityPoolCard() {
         </div>
       )}
 
+      {/* Actions */}
+      <div className="mb-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Actions</p>
+      </div>
+
       {/* Mode Selector */}
-      <div className="mb-6 flex space-x-2 border-b border-gray-200">
+      <div className="mb-6 flex space-x-2 border-b border-gray-100">
         <button
           className={`px-4 py-2 font-medium transition-colors ${
             mode === 'deposit'
@@ -189,10 +214,10 @@ export function StabilityPoolCard() {
       </div>
 
       {/* Deposit/Withdraw Form */}
-      <div className="space-y-4">
+      <div className="space-y-3">
         <Input
           type="number"
-          label={mode === 'deposit' ? 'Deposit Amount (rUSD)' : 'Withdraw Amount (rUSD)'}
+          label={mode === 'deposit' ? 'Deposit Amount (crdUSD)' : 'Withdraw Amount (crdUSD)'}
           placeholder="0.0"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
@@ -212,10 +237,10 @@ export function StabilityPoolCard() {
           }
         />
 
-        <div className="text-sm text-gray-600">
-          Available: {mode === 'deposit'
+        <div className="text-xs text-gray-500">
+          Available: <span className="font-medium text-gray-700">{mode === 'deposit'
             ? (rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--')
-            : (depositAmount ? formatBigInt(depositAmount, 18, 2) : '--')} rUSD
+            : (depositAmount ? formatBigInt(depositAmount, 18, 2) : '--')}</span> crdUSD
         </div>
 
         {mode === 'deposit' ? (
@@ -238,10 +263,10 @@ export function StabilityPoolCard() {
       </div>
 
       {/* Info Box */}
-      <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-lg">
+      <div className="mt-6 p-4 bg-primary-50 border border-primary-200 rounded-xl">
         <p className="text-sm text-primary-900 font-medium mb-2">💡 How it works</p>
         <ul className="text-sm text-primary-800 space-y-1">
-          <li>• Deposit rUSD to help absorb liquidated debt</li>
+          <li>• Deposit crdUSD to help absorb liquidated debt</li>
           <li>• Earn wCTC collateral from liquidations</li>
           <li>• Your share proportional to pool deposit</li>
           <li>• Claim collateral gains anytime</li>

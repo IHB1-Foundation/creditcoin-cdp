@@ -39,6 +39,7 @@ function extractAddresses(broadcast) {
     'WCTC',
     'Stablecoin',
     'PushOracle',
+    'MockOracle',
     'Treasury',
     'VaultManager',
     'StabilityPool',
@@ -124,7 +125,7 @@ function main() {
   const updatedEnv = updateEnvLines(loadEnv(envPath), {
     WCTC_ADDRESS: addrs.WCTC,
     STABLECOIN_ADDRESS: addrs.Stablecoin,
-    ORACLE_ADDRESS: addrs.PushOracle,
+    ORACLE_ADDRESS: addrs.PushOracle || addrs.MockOracle,
     TREASURY_ADDRESS: addrs.Treasury,
     VAULT_MANAGER_ADDRESS: addrs.VaultManager,
     STABILITY_POOL_ADDRESS: addrs.StabilityPool,
@@ -147,7 +148,7 @@ function main() {
     `NEXT_PUBLIC_VAULT_MANAGER_ADDRESS=${addrs.VaultManager}`,
     `NEXT_PUBLIC_STABILITY_POOL_ADDRESS=${addrs.StabilityPool}`,
     `NEXT_PUBLIC_LIQUIDATION_ENGINE_ADDRESS=${addrs.LiquidationEngine}`,
-    `NEXT_PUBLIC_ORACLE_ADDRESS=${addrs.PushOracle}`,
+    `NEXT_PUBLIC_ORACLE_ADDRESS=${addrs.PushOracle || addrs.MockOracle}`,
     `NEXT_PUBLIC_TREASURY_ADDRESS=${addrs.Treasury}`,
     '',
   ].join('\n');
@@ -164,4 +165,3 @@ try {
   console.error('[post_deploy] Error:', err.message || err);
   process.exit(1);
 }
-
