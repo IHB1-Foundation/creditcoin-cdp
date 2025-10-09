@@ -96,6 +96,30 @@ All 25 tests should pass:
 
 ## Deployment
 
+### One‑Shot Deploy + Frontend Bind
+
+```bash
+# Configure .env at repo root (RPC_URL, CHAIN_ID, PRIVATE_KEY, ...)
+cp .env.example .env && $EDITOR .env
+
+# Run one-shot deploy and binding
+bash scripts/deploy_and_bind.sh
+
+# Frontend env is written to frontend/.env.local
+```
+
+What it does:
+- Runs `forge script script/Deploy.s.sol --broadcast` against `RPC_URL`/`CHAIN_ID`
+- Parses broadcast output to capture deployed addresses
+- Updates root `.env` address entries
+- Writes `frontend/.env.local` with all `NEXT_PUBLIC_*` variables
+
+Troubleshooting:
+- If you see `Method not found (-32601)`, your RPC may not support certain EIP-1559 or simulation methods.
+  - Use legacy tx (default): `USE_LEGACY_TX=true bash scripts/deploy_and_bind.sh`
+  - Pin gas price if needed: `GAS_PRICE_GWEI=2 bash scripts/deploy_and_bind.sh`
+  - Skip simulation (default): `SKIP_SIMULATION=true bash scripts/deploy_and_bind.sh`
+
 ### Local Deployment (Anvil)
 
 ```bash
