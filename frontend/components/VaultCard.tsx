@@ -21,7 +21,7 @@ export function VaultCard() {
   const { address, isConnected } = useAccount();
   const { vaultIds, isLoading: vaultIdsLoading, refetch: refetchVaultIds } = useUserVaults();
   const { price } = useOracle();
-  const { mcr, borrowingFee } = useProtocolParams();
+  const { mcr, liquidationRatio, borrowingFee } = useProtocolParams();
 
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
   const [mode, setMode] = useState<'adjust' | 'close'>('adjust');
@@ -179,8 +179,8 @@ export function VaultCard() {
     );
   }
 
-  const healthStatus = vault && collateralRatio && mcr ? getHealthStatus(collateralRatio, mcr) : null;
-  const liquidationPrice = vault && mcr && price ? calculateLiquidationPrice(vault.collateral, vault.debt, mcr) : undefined;
+  const healthStatus = vault && collateralRatio && liquidationRatio ? getHealthStatus(collateralRatio, liquidationRatio) : null;
+  const liquidationPrice = vault && liquidationRatio && price ? calculateLiquidationPrice(vault.collateral, vault.debt, liquidationRatio) : undefined;
 
   let vaultsSubtitle = vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet';
   if (vaultInterest !== undefined && vaultId !== undefined && !vaultLoading) {
@@ -267,7 +267,7 @@ export function VaultCard() {
                 <span className={healthStatus?.color}>
                   {collateralRatio ? formatPercentage(collateralRatio) : '--'}
                 </span>
-                <HealthBadge ratio={collateralRatio} mcr={mcr} />
+                <HealthBadge ratio={collateralRatio} mcr={liquidationRatio} />
               </span>
             }
           />
@@ -477,7 +477,7 @@ export function VaultCard() {
                 const newDebt = isBorrow ? (vault.debt + debtDeltaBI) : (vault.debt - debtDeltaBI);
                 if (newCollateral >= BigInt(0) && newDebt > BigInt(0)) {
                   const ratio = calculateCollateralRatio(newCollateral, newDebt, price);
-                  const health = getHealthStatus(ratio, mcr);
+                  const health = getHealthStatus(ratio, liquidationRatio ?? mcr);
                   return (
                     <div className="mt-2 text-sm text-gray-600">
                       <span className="mr-2">Projected ratio:</span>

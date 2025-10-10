@@ -248,6 +248,11 @@ export function useProtocolParams() {
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
+        functionName: 'liquidationRatio',
+      },
+      {
+        address: CONTRACTS.VAULT_MANAGER,
+        abi: VaultManagerABI,
         functionName: 'borrowingFee',
       },
       {
@@ -275,11 +280,12 @@ export function useProtocolParams() {
 
   return {
     mcr: data?.[0]?.result as bigint | undefined,
-    borrowingFee: data?.[1]?.result as bigint | undefined,
-    redemptionFee: data?.[2]?.result as bigint | undefined,
-    totalDebt: data?.[3]?.result as bigint | undefined,
-    totalCollateral: data?.[4]?.result as bigint | undefined,
-    totalDebtCurrent: data?.[5]?.result as bigint | undefined,
+    liquidationRatio: data?.[1]?.result as bigint | undefined,
+    borrowingFee: data?.[2]?.result as bigint | undefined,
+    redemptionFee: data?.[3]?.result as bigint | undefined,
+    totalDebt: data?.[4]?.result as bigint | undefined,
+    totalCollateral: data?.[5]?.result as bigint | undefined,
+    totalDebtCurrent: data?.[6]?.result as bigint | undefined,
     isLoading,
   };
 }

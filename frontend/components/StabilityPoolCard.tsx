@@ -170,19 +170,20 @@ export function StabilityPoolCard() {
         />
       </div>
 
-      {/* Claim Button */}
-      {collateralGain && collateralGain > BigInt(0) && (
-        <div className="mb-6">
-          <Button
-            className="w-full"
-            variant="success"
-            onClick={handleClaim}
-            isLoading={isClaiming}
-          >
-            Claim {formatBigInt(collateralGain, 18, 4)} tCTC
-          </Button>
-        </div>
-      )}
+      {/* Claim Button (always visible; disabled if no gains) */}
+      <div className="mb-6">
+        <Button
+          className="w-full"
+          variant="success"
+          onClick={handleClaim}
+          isLoading={isClaiming}
+          disabled={!collateralGain || collateralGain === BigInt(0)}
+        >
+          {collateralGain && collateralGain > BigInt(0)
+            ? `Claim ${formatBigInt(collateralGain, 18, 4)} tCTC`
+            : 'Claim (no gains)'}
+        </Button>
+      </div>
 
       {/* Actions */}
       <div className="mb-3">

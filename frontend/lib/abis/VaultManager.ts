@@ -190,6 +190,13 @@ export const VaultManagerABI = [
   },
   {
     type: 'function',
+    name: 'liquidationRatio',
+    inputs: [],
+    outputs: [{ name: '', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
     name: 'borrowingFee',
     inputs: [],
     outputs: [{ name: '', type: 'uint256' }],

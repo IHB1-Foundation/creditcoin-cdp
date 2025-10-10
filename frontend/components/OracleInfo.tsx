@@ -12,7 +12,7 @@ import { Skeleton } from './ui/Skeleton';
 
 export function OracleInfo() {
   const { price, isFresh, lastUpdateTime, isLoading: oracleLoading, refetch } = useOracle();
-  const { mcr, borrowingFee, redemptionFee, totalDebt, totalCollateral, totalDebtCurrent, isLoading: paramsLoading } = useProtocolParams();
+  const { mcr, liquidationRatio, borrowingFee, redemptionFee, totalDebt, totalCollateral, totalDebtCurrent, isLoading: paramsLoading } = useProtocolParams();
   const { minRate, maxRate, avgRate, weightedAvgRate, activeVaultCount } = useInterestStats();
 
   // Auto-refresh every 30 seconds
@@ -79,6 +79,20 @@ export function OracleInfo() {
           }
           value={mcr ? formatPercentage(mcr) : '--'}
           subtitle="Required minimum"
+        />
+
+        {/* Liquidation Ratio */}
+        <StatCard
+          label={
+            <span className="inline-flex items-center gap-1">
+              Liquidation Threshold
+              <Tooltip content="Collateral ratio below which a vault can be liquidated.">
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
+          value={liquidationRatio ? formatPercentage(liquidationRatio) : '--'}
+          subtitle="Triggers liquidation"
         />
 
         {/* Borrowing Fee */}

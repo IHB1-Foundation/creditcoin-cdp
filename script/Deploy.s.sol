@@ -19,7 +19,10 @@ contract DeployScript is Script {
     // Deployment parameters
     uint256 constant INITIAL_PRICE = 10e18; // $2000 per wCTC
     uint256 constant STALENESS_THRESHOLD = 1 hours;
-    uint256 constant MCR = 1.3e18; // 130% minimum collateral ratio
+    // Policy: Max LTV 85% => MCR = 1/0.85 ≈ 117.647%
+    uint256 constant MCR = (100e18) / 85; // ~117.647% minimum collateral ratio for borrowing
+    // Policy: Liquidation at LTV 90% => LiqRatio = 1/0.9 ≈ 111.111%
+    uint256 constant LIQUIDATION_RATIO = (100e18) / 90;
     uint256 constant BORROWING_FEE = 5e15; // 0.5%
     uint256 constant LIQUIDATION_PENALTY = 5e16; // 5%
 
@@ -106,6 +109,9 @@ contract DeployScript is Script {
 
         stabilityPool.setLiquidationEngine(address(liquidationEngine));
         console.log("  LiquidationEngine set in StabilityPool");
+        // Set liquidation threshold
+        vaultManager.setLiquidationRatio(LIQUIDATION_RATIO);
+        console.log("  Liquidation Ratio set to:", LIQUIDATION_RATIO);
         console.log("");
 
         vm.stopBroadcast();
@@ -125,7 +131,8 @@ contract DeployScript is Script {
         console.log("");
         console.log("Protocol Parameters:");
         console.log("  Initial Price: $%s per wCTC", INITIAL_PRICE / 1e18);
-        console.log("  MCR: %s%%", (MCR * 100) / 1e18);
+        console.log("  MCR (Borrow): %s%%", (MCR * 100) / 1e18);
+        console.log("  Liquidation Threshold: %s%%", (LIQUIDATION_RATIO * 100) / 1e18);
         console.log("  Borrowing Fee: %s%%", (BORROWING_FEE * 100) / 1e18);
         console.log("  Liquidation Penalty: %s%%", (LIQUIDATION_PENALTY * 100) / 1e18);
         // MockOracle has no staleness; values vary deterministically in [$0.52,$0.58]

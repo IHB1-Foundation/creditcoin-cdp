@@ -35,7 +35,8 @@ contract VaultManager {
     ITreasury public immutable treasury;        // Fee collection
 
     // Parameters
-    uint256 public minCollateralRatio;          // e.g., 1.3e18 = 130%
+    uint256 public minCollateralRatio;          // e.g., 1.3e18 = 130% (borrow constraint)
+    uint256 public liquidationRatio;            // e.g., 1.111e18 = 111.1% (liquidation threshold)
     uint256 public borrowingFee;                // e.g., 5e15 = 0.5%
     uint256 public redemptionFee;               // e.g., 5e15 = 0.5%
 
@@ -137,6 +138,8 @@ contract VaultManager {
         treasury = ITreasury(_treasury);
 
         minCollateralRatio = _minCollateralRatio;
+        // By default, set liquidation threshold equal to MCR; owner can lower it later
+        liquidationRatio = _minCollateralRatio;
         borrowingFee = _borrowingFee;
         redemptionFee = 5e15; // Default 0.5%
 
@@ -1002,7 +1005,7 @@ contract VaultManager {
 
         uint256 price = oracle.getPrice();
         uint256 collateralValue = (vault.collateral * price) / PRECISION;
-        uint256 requiredCollateral = (currentDebt * minCollateralRatio) / PRECISION;
+        uint256 requiredCollateral = (currentDebt * liquidationRatio) / PRECISION;
         return collateralValue < requiredCollateral;
     }
 
@@ -1113,6 +1116,15 @@ contract VaultManager {
         borrowingFee = _borrowingFee;
 
         emit ParametersUpdated(_minCollateralRatio, _borrowingFee);
+    }
+
+    /**
+     * @notice Update liquidation collateral ratio threshold
+     * @param _liquidationRatio New liquidation ratio (e.g., 1.11e18 for 111%)
+     */
+    function setLiquidationRatio(uint256 _liquidationRatio) external onlyOwner {
+        if (_liquidationRatio < PRECISION) revert InvalidParameters();
+        liquidationRatio = _liquidationRatio;
     }
 
     /**

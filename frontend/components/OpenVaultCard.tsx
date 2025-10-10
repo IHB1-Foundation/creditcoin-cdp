@@ -19,7 +19,7 @@ export function OpenVaultCard() {
   const { isConnected } = useAccount();
   const { tctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { price } = useOracle();
-  const { mcr, borrowingFee } = useProtocolParams();
+  const { mcr, liquidationRatio, borrowingFee } = useProtocolParams();
 
   const [collateralAmount, setCollateralAmount] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
@@ -72,7 +72,7 @@ export function OpenVaultCard() {
     projectedCollateral > BigInt(0) && projectedDebt > BigInt(0) && price
       ? calculateCollateralRatio(projectedCollateral, projectedDebt, price)
       : undefined;
-  const projectedHealth = projectedRatio && mcr ? getHealthStatus(projectedRatio, mcr) : null;
+  const projectedHealth = projectedRatio && liquidationRatio ? getHealthStatus(projectedRatio, liquidationRatio) : null;
 
   // Tooltip helpers
   const gasBuffer = BigInt(5_000_000_000_000_000); // ~0.005 tCTC
