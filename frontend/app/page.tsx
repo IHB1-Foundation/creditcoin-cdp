@@ -3,6 +3,7 @@
 import { Header } from '@/components/Header';
 import { OracleInfo } from '@/components/OracleInfo';
 import { VaultCard } from '@/components/VaultCard';
+import { OpenVaultCard } from '@/components/OpenVaultCard';
 import { StabilityPoolCard } from '@/components/StabilityPoolCard';
 import { RedemptionCard } from '@/components/RedemptionCard';
 
@@ -21,6 +22,7 @@ export default function Home() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Left Column */}
           <div className="space-y-8">
+            <OpenVaultCard />
             <VaultCard />
           </div>
 

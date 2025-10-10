@@ -24,7 +24,7 @@ export function VaultCard() {
   const { mcr } = useProtocolParams();
 
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
-  const [mode, setMode] = useState<'open' | 'adjust' | 'close'>('open');
+  const [mode, setMode] = useState<'adjust' | 'close'>('adjust');
 
   // Form state
   const [collateralAmount, setCollateralAmount] = useState('');
@@ -33,7 +33,7 @@ export function VaultCard() {
   const [debtDelta, setDebtDelta] = useState('');
   const [isDeposit, setIsDeposit] = useState(true);
   const [isBorrow, setIsBorrow] = useState(true);
-  const [interestRate, setInterestRate] = useState('5'); // percent (two decimals supported)
+  // Open-vault interest rate controls moved to OpenVaultCard
   const [newInterest, setNewInterest] = useState('');
 
   // Persist and restore selected vault id via localStorage for cross-component visibility (Header)
@@ -78,13 +78,7 @@ export function VaultCard() {
   }, [openSuccess, adjustSuccess, closeSuccess, approveSuccess, updateInterestSuccess]);
 
   // Reset form on success
-  useEffect(() => {
-    if (openSuccess) {
-      setCollateralAmount('');
-      setDebtAmount('');
-      toast.success('Vault opened successfully!');
-    }
-  }, [openSuccess]);
+  // Open flow removed from this card
 
   useEffect(() => {
     if (adjustSuccess) {
@@ -97,48 +91,13 @@ export function VaultCard() {
   useEffect(() => {
     if (closeSuccess) {
       toast.success('Vault closed successfully!');
-      setMode('open');
+      setMode('adjust');
     }
   }, [closeSuccess]);
 
-  const handleOpenVault = async () => {
-    try {
-      const collateral = parseToBigInt(collateralAmount);
-      const debt = parseToBigInt(debtAmount);
+  // Open flow moved to OpenVaultCard
 
-      if (collateral === BigInt(0) || debt === BigInt(0)) {
-        toast.error('Please enter valid amounts');
-        return;
-      }
-
-      if (debt < PROTOCOL_PARAMS.MIN_DEBT) {
-        toast.error(`Minimum debt is ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT)} crdUSD`);
-        return;
-      }
-
-      // interestRate is a percent string, convert to 1e18
-      let rateNum = Number(interestRate);
-      if (isNaN(rateNum) || rateNum < 0 || rateNum > 40) {
-        toast.error('Interest rate must be between 0% and 40%');
-        return;
-      }
-      // Round to two decimals (2-fixed points support)
-      rateNum = Math.round(rateNum * 100) / 100;
-      const rateWad = parseToBigInt((rateNum / 100).toString());
-      await openVault(collateral, debt, rateWad);
-    } catch (error) {
-      // Error handling in hook
-    }
-  };
-
-  // Projected health for Open Vault form
-  const projectedCollateralOpen = parseToBigInt(collateralAmount);
-  const projectedDebtOpen = parseToBigInt(debtAmount);
-  const projectedRatioOpen =
-    projectedCollateralOpen > BigInt(0) && projectedDebtOpen > BigInt(0) && price
-      ? calculateCollateralRatio(projectedCollateralOpen, projectedDebtOpen, price)
-      : undefined;
-  const projectedHealthOpen = projectedRatioOpen && mcr ? getHealthStatus(projectedRatioOpen, mcr) : null;
+  // Open flow moved to OpenVaultCard
 
   const handleAdjustVault = async () => {
     if (!vaultId) return;
@@ -304,49 +263,34 @@ export function VaultCard() {
         </div>
       )}
 
-      {/* Mode Selector */}
-      <div className="mb-3">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Actions</p>
-      </div>
-      <div className="mb-6 flex space-x-2 border-b border-gray-100">
-        <button
-          className={`px-4 py-2 font-medium transition-colors ${
-            mode === 'open'
-              ? 'text-primary-600 border-b-2 border-primary-600'
-              : 'text-gray-500 hover:text-gray-700'
-          }`}
-          onClick={() => setMode('open')}
-        >
-          Open Vault
-        </button>
-        {vaultIds && vaultIds.length > 0 && (
-          <>
-            <button
-              className={`px-4 py-2 font-medium transition-colors ${
-                mode === 'adjust'
-                  ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setMode('adjust')}
-            >
-              Adjust Vault
-            </button>
-            <button
-              className={`px-4 py-2 font-medium transition-colors ${
-                mode === 'close'
-                  ? 'text-primary-600 border-b-2 border-primary-600'
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setMode('close')}
-            >
-              Close Vault
-            </button>
-          </>
-        )}
-      </div>
+      {/* Actions */}
+      {vaultIds && vaultIds.length > 0 && (
+        <div className="mb-6 flex space-x-2 border-b border-gray-100">
+          <button
+            className={`px-4 py-2 font-medium transition-colors ${
+              mode === 'adjust'
+                ? 'text-primary-600 border-b-2 border-primary-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setMode('adjust')}
+          >
+            Adjust Vault
+          </button>
+          <button
+            className={`px-4 py-2 font-medium transition-colors ${
+              mode === 'close'
+                ? 'text-primary-600 border-b-2 border-primary-600'
+                : 'text-gray-500 hover:text-gray-700'
+            }`}
+            onClick={() => setMode('close')}
+          >
+            Close Vault
+          </button>
+        </div>
+      )}
 
-      {/* Open Vault Form */}
-      {mode === 'open' && (
+      {/* Open flow moved to OpenVaultCard */}
+      {false && (
         <div className="space-y-3">
           <Input
             type="number"
@@ -364,59 +308,13 @@ export function VaultCard() {
         onChange={(e) => setDebtAmount(e.target.value)}
       />
 
-      <div>
-        <div className="flex items-center justify-between mb-1">
-          <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
-          <span className="text-xs text-gray-500">0 - 40</span>
-        </div>
-        {/* Quick-select presets */}
-        <div className="mb-2 flex gap-2">
-          {["5", "10", "15", "20"].map((p) => (
-            <button
-              key={p}
-              type="button"
-              className={`px-2 py-1 text-xs rounded border ${interestRate === p ? 'bg-primary-50 border-primary-200 text-primary-700' : 'bg-white border-gray-200 text-gray-700'}`}
-              onClick={() => setInterestRate(p)}
-            >
-              {p}%
-            </button>
-          ))}
-        </div>
-        <Input
-          type="number"
-          placeholder="5.0"
-          value={interestRate}
-          onChange={(e) => setInterestRate(e.target.value)}
-        />
-        <p className="mt-1 text-xs text-gray-500">You can adjust this later. Redemptions target lowest APR first.</p>
-      </div>
+        <div />
 
-          {/* Projected health preview */}
-          {price && mcr && projectedRatioOpen !== undefined && projectedRatioOpen > BigInt(0) && (
-            <div className="-mt-1 text-sm text-gray-600">
-              <span className="mr-2">Projected ratio</span>
-              <span className={projectedHealthOpen?.color}>
-                {formatPercentage(projectedRatioOpen)}
-              </span>
-              <span className="ml-2 text-xs text-gray-500">(min {formatPercentage(mcr)})</span>
-            </div>
-          )}
+          {/* Projected health preview moved to OpenVaultCard */}
 
-          {/* Selected interest preview */}
-          <div className="-mt-1 text-xs text-gray-500">
-            Selected interest: <span className="font-medium">{(() => {
-              const rateNum = Number(interestRate);
-              return isNaN(rateNum) ? '--' : `${rateNum.toFixed(2)}%`;
-            })()}</span> APR
-          </div>
+          {/* Selected interest preview removed from open flow */}
 
-          <Button
-            className="w-full"
-            onClick={handleOpenVault}
-            isLoading={isOpening || isApproving}
-          >
-            {isApproving ? 'Approving...' : 'Open Vault'}
-          </Button>
+          {/* Button removed; see OpenVaultCard */}
         </div>
       )}
 
