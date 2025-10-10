@@ -25,6 +25,18 @@ export function formatBigInt(value: bigint, decimals: number = 18, displayDecima
 }
 
 /**
+ * Convert a BigInt token amount to a plain, non-localized decimal string suitable for input fields.
+ * Does not include thousands separators and preserves full precision unless maxDecimals is provided.
+ */
+export function formatForInput(value: bigint, decimals: number = 18, maxDecimals?: number): string {
+  let s = formatUnits(value, decimals);
+  if (maxDecimals === undefined) return s;
+  const [intPart, fracPart = ''] = s.split('.');
+  if (maxDecimals <= 0) return intPart;
+  return fracPart.length ? `${intPart}.${fracPart.slice(0, maxDecimals)}` : intPart;
+}
+
+/**
  * Format a BigInt compactly (e.g., 12.3K, 4.5M)
  */
 export function formatCompactBigInt(value: bigint, decimals: number = 18): string {

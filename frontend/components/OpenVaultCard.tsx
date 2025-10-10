@@ -4,20 +4,22 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { Tooltip } from './ui/Tooltip';
+import { InfoIcon } from './ui/InfoIcon';
 import { useAccount } from 'wagmi';
 import { useOpenVault, useProtocolParams } from '@/hooks/useVault';
 import { useTokenBalances } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { PROTOCOL_PARAMS } from '@/lib/config';
-import { formatBigInt, parseToBigInt, formatPercentage } from '@/lib/utils';
+import { formatBigInt, parseToBigInt, formatPercentage, formatForInput } from '@/lib/utils';
 import { calculateCollateralRatio, getHealthStatus } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export function OpenVaultCard() {
   const { isConnected } = useAccount();
-  const { tctcBalance, refetch: refetchBalances } = useTokenBalances();
+  const { tctcBalance, rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { price } = useOracle();
-  const { mcr } = useProtocolParams();
+  const { mcr, borrowingFee } = useProtocolParams();
 
   const [collateralAmount, setCollateralAmount] = useState('');
   const [debtAmount, setDebtAmount] = useState('');
@@ -72,6 +74,23 @@ export function OpenVaultCard() {
       : undefined;
   const projectedHealth = projectedRatio && mcr ? getHealthStatus(projectedRatio, mcr) : null;
 
+  // Tooltip helpers
+  const gasBuffer = BigInt(5_000_000_000_000_000); // ~0.005 tCTC
+  const spendableTctc = tctcBalance !== undefined ? (tctcBalance > gasBuffer ? (tctcBalance - gasBuffer) : BigInt(0)) : undefined;
+  const borrowCapacity = (() => {
+    try {
+      if (!price || !mcr) return undefined;
+      const collateral = parseToBigInt(collateralAmount);
+      if (collateral === BigInt(0)) return undefined;
+      const PREC = BigInt(1e18);
+      const cv = (collateral * price) / PREC;
+      const maxDebtGross = (cv * PREC) / mcr;
+      const bf = borrowingFee ?? BigInt(0);
+      const denom = PREC + bf;
+      return (maxDebtGross * PREC) / denom;
+    } catch { return undefined; }
+  })();
+
   if (!isConnected) {
     return (
       <Card title="Open New Vault" subtitle="Deposit tCTC and borrow crdUSD">
@@ -87,14 +106,28 @@ export function OpenVaultCard() {
       <div className="space-y-3">
         <Input
           type="number"
-          label="Collateral Amount (tCTC)"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Collateral Amount (tCTC)
+              <Tooltip content={`Balance: ${tctcBalance ? formatBigInt(tctcBalance, 18, 4) : '--'} tCTC${spendableTctc !== undefined ? ` • Spendable: ${formatBigInt(spendableTctc, 18, 4)} tCTC` : ''}`}>
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           placeholder="0.0"
           value={collateralAmount}
           onChange={(e) => setCollateralAmount(e.target.value)}
           rightElement={
             <button
               className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              onClick={() => tctcBalance && setCollateralAmount(formatBigInt(tctcBalance, 18, 18))}
+              onClick={() => {
+                if (tctcBalance) {
+                  // Leave small buffer for gas (e.g., 0.005 tCTC)
+                  const buffer = BigInt(5_000_000_000_000_000); // 0.005e18
+                  const spendable = tctcBalance > buffer ? (tctcBalance - buffer) : BigInt(0);
+                  setCollateralAmount(formatForInput(spendable, 18));
+                }
+              }}
             >
               MAX
             </button>
@@ -103,10 +136,45 @@ export function OpenVaultCard() {
 
         <Input
           type="number"
-          label="Borrow Amount (crdUSD)"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Borrow Amount (crdUSD)
+              <Tooltip content={`Balance: ${rusdBalance ? formatBigInt(rusdBalance, 18, 4) : '--'} crdUSD${borrowCapacity !== undefined ? ` • Capacity: ${formatBigInt(borrowCapacity, 18, 2)} crdUSD` : ''} • Min: ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT, 18, 2)} crdUSD`}>
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           placeholder="0.0"
           value={debtAmount}
           onChange={(e) => setDebtAmount(e.target.value)}
+          rightElement={
+            <button
+              className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+              onClick={() => {
+                try {
+                  if (!price || !mcr) return;
+                  const collateral = parseToBigInt(collateralAmount);
+                  if (collateral === BigInt(0)) return;
+                  const PREC = BigInt(1e18);
+                  const cv = (collateral * price) / PREC; // collateral value in USD (1e18)
+                  // Max total debt allowed by MCR
+                  const maxDebtGross = (cv * PREC) / mcr; // USD (1e18)
+                  // Account for borrowing fee on the borrowed amount x
+                  const bf = borrowingFee ?? BigInt(0);
+                  const denom = PREC + bf; // (1e18 + fee)
+                  // Max borrow x so that x + x*fee <= maxDebtGross
+                  let maxBorrow = (maxDebtGross * PREC) / denom;
+                  if (maxBorrow < PROTOCOL_PARAMS.MIN_DEBT) {
+                    // Not enough collateral for minimum debt
+                    maxBorrow = BigInt(0);
+                  }
+                  setDebtAmount(formatForInput(maxBorrow, 18));
+                } catch {}
+              }}
+            >
+              MAX
+            </button>
+          }
         />
 
         <div>
@@ -153,4 +221,3 @@ export function OpenVaultCard() {
     </Card>
   );
 }
-

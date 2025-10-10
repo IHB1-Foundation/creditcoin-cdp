@@ -9,7 +9,7 @@ import { useAccount } from 'wagmi';
 import { useStabilityPoolData, useStabilityDeposit, useStabilityWithdraw, useClaimCollateralGain } from '@/hooks/useStabilityPool';
 import { useTokenBalances, useAllowances, useApprove } from '@/hooks/useTokens';
 import { CONTRACTS } from '@/lib/config';
-import { formatBigInt, formatCompactBigInt, parseToBigInt } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, parseToBigInt, formatForInput } from '@/lib/utils';
 import { Skeleton } from './ui/Skeleton';
 import toast from 'react-hot-toast';
 
@@ -226,9 +226,9 @@ export function StabilityPoolCard() {
               className="text-sm text-primary-600 hover:text-primary-700 font-medium"
               onClick={() => {
                 if (mode === 'deposit' && rusdBalance) {
-                  setAmount(formatBigInt(rusdBalance, 18, 18));
+                  setAmount(formatForInput(rusdBalance, 18));
                 } else if (mode === 'withdraw' && depositAmount) {
-                  setAmount(formatBigInt(depositAmount, 18, 18));
+                  setAmount(formatForInput(depositAmount, 18));
                 }
               }}
             >

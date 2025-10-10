@@ -2,7 +2,7 @@ import { InputHTMLAttributes, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
+  label?: ReactNode;
   error?: string;
   rightElement?: ReactNode;
 }

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
+import { Tooltip } from './ui/Tooltip';
+import { InfoIcon } from './ui/InfoIcon';
 import { StatCard } from './ui/StatCard';
 import { useAccount } from 'wagmi';
 import { useRedemptionEstimate, useRedeem } from '@/hooks/useRedemption';
@@ -11,7 +13,7 @@ import { useTokenBalances, useAllowances, useApprove } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { CONTRACTS } from '@/lib/config';
 import { useInterestStats } from '@/hooks/useVault';
-import { formatBigInt, formatPercentage, formatUSD, parseToBigInt } from '@/lib/utils';
+import { formatBigInt, formatPercentage, formatUSD, parseToBigInt, formatForInput } from '@/lib/utils';
 import toast from 'react-hot-toast';
 
 export function RedemptionCard() {
@@ -91,14 +93,21 @@ export function RedemptionCard() {
       <div className="space-y-3">
         <Input
           type="number"
-          label="crdUSD Amount"
+          label={
+            <span className="inline-flex items-center gap-1">
+              Redemption Amount (crdUSD)
+              <Tooltip content={`Balance: ${rusdBalance ? formatBigInt(rusdBalance, 18, 4) : '--'} crdUSD • Max redeemable: ${rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--'} crdUSD`}>
+                <span><InfoIcon /></span>
+              </Tooltip>
+            </span>
+          }
           placeholder="0.0"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           rightElement={
             <button
               className="text-sm text-primary-600 hover:text-primary-700 font-medium"
-              onClick={() => rusdBalance && setAmount(formatBigInt(rusdBalance, 18, 18))}
+              onClick={() => rusdBalance && setAmount(formatForInput(rusdBalance, 18))}
             >
               MAX
             </button>

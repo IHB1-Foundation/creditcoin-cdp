@@ -13,7 +13,7 @@ import { Skeleton } from './ui/Skeleton';
 import { useTokenBalances, useAllowances, useApprove, useWrap } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { CONTRACTS, PROTOCOL_PARAMS } from '@/lib/config';
-import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio, formatForInput } from '@/lib/utils';
 import { HealthBadge } from './ui/HealthBadge';
 import toast from 'react-hot-toast';
 
@@ -21,7 +21,7 @@ export function VaultCard() {
   const { address, isConnected } = useAccount();
   const { vaultIds, isLoading: vaultIdsLoading, refetch: refetchVaultIds } = useUserVaults();
   const { price } = useOracle();
-  const { mcr } = useProtocolParams();
+  const { mcr, borrowingFee } = useProtocolParams();
 
   const [selectedVaultIndex, setSelectedVaultIndex] = useState(0);
   const [mode, setMode] = useState<'adjust' | 'close'>('adjust');
@@ -66,6 +66,34 @@ export function VaultCard() {
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
   // Native zapper: no wrapping needed in UI
   const { updateInterest, isPending: isUpdatingInterest, isSuccess: updateInterestSuccess } = useUpdateInterest();
+
+  // Tooltip helpers for Adjust mode (place after balances and vault are known)
+  const withdrawable = (() => {
+    try {
+      if (!price || !mcr || !vault) return undefined;
+      const PREC = BigInt(1e18);
+      const requiredValue = (vault.debt * mcr) / PREC;
+      const minCollateral = (requiredValue * PREC) / price;
+      return vault.collateral > minCollateral ? (vault.collateral - minCollateral) : BigInt(0);
+    } catch { return undefined; }
+  })();
+  const additionalBorrow = (() => {
+    try {
+      if (!price || !mcr || !vault) return undefined;
+      const PREC = BigInt(1e18);
+      const cv = (vault.collateral * price) / PREC;
+      const maxDebtGross = (cv * PREC) / mcr;
+      const remainingCapacity = maxDebtGross > vault.debt ? (maxDebtGross - vault.debt) : BigInt(0);
+      const bf = borrowingFee ?? BigInt(0);
+      const denom = PREC + bf;
+      return (remainingCapacity * PREC) / denom;
+    } catch { return undefined; }
+  })();
+  const repayable = (() => {
+    if (!vault) return undefined;
+    if (rusdBalance === undefined) return vault.debt;
+    return rusdBalance < vault.debt ? rusdBalance : vault.debt;
+  })();
 
   // Refetch data when transactions succeed
   useEffect(() => {
@@ -323,7 +351,12 @@ export function VaultCard() {
         <div className="space-y-3">
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Collateral</label>
+              <label className="text-sm font-medium text-gray-700 inline-flex items-center gap-1">
+                Collateral
+                <Tooltip content={`Balance: ${tctcBalance ? formatBigInt(tctcBalance, 18, 4) : '--'} tCTC${withdrawable !== undefined ? ` • Withdrawable: ${formatBigInt(withdrawable, 18, 4)} tCTC` : ''}`}>
+                  <span><InfoIcon /></span>
+                </Tooltip>
+              </label>
               <div className="flex space-x-2">
                 <button
                   className={`px-3 py-1 text-sm rounded ${
@@ -348,12 +381,41 @@ export function VaultCard() {
               placeholder="0.0"
               value={collateralDelta}
               onChange={(e) => setCollateralDelta(e.target.value)}
+              rightElement={
+                <button
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  onClick={() => {
+                    if (!vault || !price || !mcr) return;
+                    if (isDeposit) {
+                      if (tctcBalance !== undefined) {
+                        const buffer = BigInt(5_000_000_000_000_000); // 0.005 tCTC gas buffer
+                        const spendable = tctcBalance > buffer ? (tctcBalance - buffer) : BigInt(0);
+                        setCollateralDelta(formatForInput(spendable, 18));
+                      }
+                    } else {
+                      // Max withdraw keeping MCR
+                      const PREC = BigInt(1e18);
+                      const requiredValue = (vault.debt * mcr) / PREC; // USD
+                      const minCollateral = (requiredValue * PREC) / price; // tCTC
+                      const maxWithdraw = vault.collateral > minCollateral ? (vault.collateral - minCollateral) : BigInt(0);
+                      setCollateralDelta(formatForInput(maxWithdraw, 18));
+                    }
+                  }}
+                >
+                  MAX
+                </button>
+              }
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-sm font-medium text-gray-700">Debt</label>
+              <label className="text-sm font-medium text-gray-700 inline-flex items-center gap-1">
+                Debt
+                <Tooltip content={`Balance: ${rusdBalance ? formatBigInt(rusdBalance, 18, 4) : '--'} crdUSD${additionalBorrow !== undefined ? ` • Borrow cap: ${formatBigInt(additionalBorrow, 18, 2)} crdUSD` : ''}${repayable !== undefined ? ` • Repayable: ${formatBigInt(repayable, 18, 2)} crdUSD` : ''}`}>
+                  <span><InfoIcon /></span>
+                </Tooltip>
+              </label>
               <div className="flex space-x-2">
                 <button
                   className={`px-3 py-1 text-sm rounded ${
@@ -378,6 +440,31 @@ export function VaultCard() {
               placeholder="0.0"
               value={debtDelta}
               onChange={(e) => setDebtDelta(e.target.value)}
+              rightElement={
+                <button
+                  className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                  onClick={() => {
+                    if (!vault || !price || !mcr) return;
+                    const PREC = BigInt(1e18);
+                    if (isBorrow) {
+                      // Max additional borrow under MCR considering fee
+                      const cv = (vault.collateral * price) / PREC; // USD
+                      const maxDebtGross = (cv * PREC) / mcr; // USD
+                      const remainingCapacity = maxDebtGross > vault.debt ? (maxDebtGross - vault.debt) : BigInt(0);
+                      const bf = borrowingFee ?? BigInt(0);
+                      const denom = PREC + bf;
+                      const maxBorrow = (remainingCapacity * PREC) / denom;
+                      setDebtDelta(formatForInput(maxBorrow, 18));
+                    } else {
+                      // Max repay is current debt capped by balance
+                      const maxRepay = rusdBalance !== undefined ? (rusdBalance < vault.debt ? rusdBalance : vault.debt) : vault.debt;
+                      setDebtDelta(formatForInput(maxRepay, 18));
+                    }
+                  }}
+                >
+                  MAX
+                </button>
+              }
             />
 
             {/* Projected health after adjustment */}
