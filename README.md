@@ -18,7 +18,7 @@ See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system design and componen
 ### Core Components
 
 - **WCTC**: Wrapped tCTC token for internal accounting (frontend zaps native)
-- **Stablecoin (crdUSD)**: Protocol-controlled stablecoin
+- **CreditCoinUSD (crdUSD)**: Protocol-controlled stablecoin
 - **VaultManager**: Core CDP logic for managing collateralized positions
   - Borrowers choose a per-vault interest rate (0–40%, two decimals supported)
   - Redemptions execute from lowest-APR vaults first (prefers larger loans on ties)
@@ -252,7 +252,7 @@ scripts/redeem_with_cap.sh 1000 0xYourReceiver 3.0 true
 credit-cdp/
 ├── src/
 │   ├── WCTC.sol                 # Wrapped tCTC token
-│   ├── Stablecoin.sol           # crdUSD stablecoin
+│   ├── CreditCoinUSD.sol        # crdUSD stablecoin
 │   ├── PushOracle.sol           # Mock price oracle
 │   ├── Treasury.sol             # Fee collection
 │   ├── VaultManager.sol         # Core CDP logic

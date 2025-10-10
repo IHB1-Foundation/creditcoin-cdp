@@ -3,7 +3,7 @@ pragma solidity 0.8.7;
 
 import "forge-std/Script.sol";
 import "../src/WCTC.sol";
-import "../src/Stablecoin.sol";
+import "../src/CreditCoinUSD.sol";
 import "../src/MockOracle.sol";
 import "../src/Treasury.sol";
 import "../src/VaultManager.sol";
@@ -25,7 +25,7 @@ contract DeployScript is Script {
 
     // Deployed contracts
     WCTC public wctc;
-    Stablecoin public stablecoin;
+    CreditCoinUSD public stablecoin;
     MockOracle public oracle;
     Treasury public treasury;
     VaultManager public vaultManager;
@@ -51,8 +51,8 @@ contract DeployScript is Script {
         wctc = new WCTC();
         console.log("  WCTC deployed at:", address(wctc));
 
-        stablecoin = new Stablecoin();
-        console.log("  Stablecoin (crdUSD) deployed at:", address(stablecoin));
+        stablecoin = new CreditCoinUSD();
+        console.log("  CreditCoinUSD (crdUSD) deployed at:", address(stablecoin));
 
         oracle = new MockOracle();
         console.log("  Oracle (Mock) deployed at:", address(oracle));
@@ -115,7 +115,7 @@ contract DeployScript is Script {
         console.log("Deployment Summary");
         console.log("==============================================");
         console.log("WCTC:", address(wctc));
-        console.log("Stablecoin (crdUSD):", address(stablecoin));
+        console.log("CreditCoinUSD (crdUSD):", address(stablecoin));
         console.log("Oracle (Mock):", address(oracle));
         console.log("Treasury:", address(treasury));
         console.log("VaultManager:", address(vaultManager));

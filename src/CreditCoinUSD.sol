@@ -2,11 +2,11 @@
 pragma solidity 0.8.7;
 
 /**
- * @title Stablecoin (crdUSD)
+ * @title CreditCoinUSD (crdUSD)
  * @notice Protocol-controlled stablecoin with restricted minting and burning
  * @dev Only authorized contracts (VaultManager, StabilityPool) can mint/burn
  */
-contract Stablecoin {
+contract CreditCoinUSD {
     // =============================================================
     //                           STORAGE
     // =============================================================

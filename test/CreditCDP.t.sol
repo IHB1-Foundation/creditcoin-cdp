@@ -3,7 +3,7 @@ pragma solidity 0.8.7;
 
 import "forge-std/Test.sol";
 import "../src/WCTC.sol";
-import "../src/Stablecoin.sol";
+import "../src/CreditCoinUSD.sol";
 import "../src/PushOracle.sol";
 import "../src/Treasury.sol";
 import "../src/VaultManager.sol";
@@ -13,7 +13,7 @@ import "../src/LiquidationEngine.sol";
 contract CreditCDPTest is Test {
     // Contracts
     WCTC public wctc;
-    Stablecoin public rusd;
+    CreditCoinUSD public rusd;
     PushOracle public oracle;
     Treasury public treasury;
     VaultManager public vaultManager;
@@ -37,7 +37,7 @@ contract CreditCDPTest is Test {
     function setUp() public {
         // Deploy contracts
         wctc = new WCTC();
-        rusd = new Stablecoin();
+        rusd = new CreditCoinUSD();
         oracle = new PushOracle(STALENESS_THRESHOLD, INITIAL_PRICE);
         treasury = new Treasury();
 

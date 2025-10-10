@@ -5,6 +5,10 @@ import { Providers } from './providers';
 export const metadata: Metadata = {
   title: 'Credit CDP | CreditCoin Testnet',
   description: 'Collateralized Debt Position Protocol on CreditCoin Testnet',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

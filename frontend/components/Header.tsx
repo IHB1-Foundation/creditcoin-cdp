@@ -59,9 +59,7 @@ export function Header() {
       <div className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-primary-500 to-primary-700 rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-white font-bold text-xl">C</span>
-            </div>
+            <img src="/logo.svg" alt="Credit CDP" width={40} height={40} className="rounded-lg shadow-sm" />
             <div>
               <h1 className="text-xl font-semibold text-gray-900">Credit CDP</h1>
               <p className="text-xs text-gray-500">CreditCoin Testnet</p>

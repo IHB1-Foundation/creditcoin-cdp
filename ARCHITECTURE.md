@@ -33,7 +33,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint crdUSD (stablecoin). The
 │  └──────────────┘          └───────┬──────┘                     │
 │                                    │                             │
 │  ┌──────────────┐                  │                             │
-│  │ Stablecoin   │◄─────────────────┤                             │
+│  │ CreditCoinUSD│◄─────────────────┤                             │
 │  │   .sol       │                  │                             │
 │  │  (crdUSD)    │                  │                             │
 │  └──────┬───────┘                  │                             │
@@ -74,7 +74,7 @@ Users deposit wCTC (wrapped tCTC) as collateral to mint crdUSD (stablecoin). The
 
 ---
 
-### 2. Stablecoin.sol - crdUSD Token
+### 2. CreditCoinUSD.sol - crdUSD Token
 
 **Purpose**: Protocol-controlled stablecoin (soft-pegged to $1 USD)
 
@@ -374,7 +374,7 @@ evm_version = "london"
 
 ### Unit Tests:
 - WCTC wrap/unwrap functionality
-- Stablecoin mint/burn permissions
+- CreditCoinUSD mint/burn permissions
 - Oracle price updates and staleness
 - Vault operations (open/adjust/close)
 - Liquidation calculations
@@ -396,7 +396,7 @@ evm_version = "london"
 ## Deployment Order
 
 1. Deploy WCTC (wrapper token)
-2. Deploy Stablecoin (crdUSD)
+2. Deploy CreditCoinUSD (crdUSD)
 3. Deploy PushOracle
 4. Deploy Treasury
 5. Deploy VaultManager (with dependencies)

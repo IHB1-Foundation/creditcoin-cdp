@@ -228,7 +228,7 @@ You don't have enough tokens or native currency for gas fees.
 Update these in your `.env.local` file after deployment:
 
 - **WCTC**: Wrapped tCTC token (internal)
-- **Stablecoin**: crdUSD token
+- **CreditCoinUSD**: crdUSD token
 - **VaultManager**: Main vault operations
 - **StabilityPool**: Stability pool contract
 - **LiquidationEngine**: Liquidation logic

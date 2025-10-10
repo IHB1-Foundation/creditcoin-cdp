@@ -61,7 +61,7 @@ Updated all `.sol` files from `pragma solidity 0.8.18;` to `pragma solidity 0.8.
 
 **Files Modified** (10 files):
 1. `src/WCTC.sol`
-2. `src/Stablecoin.sol`
+2. `src/CreditCoinUSD.sol`
 3. `src/PushOracle.sol`
 4. `src/Treasury.sol`
 5. `src/VaultManager.sol`
@@ -324,7 +324,7 @@ credit-cdp/
 ├── foundry.toml                  ← Updated
 ├── src/
 │   ├── WCTC.sol                  ← Pragma updated
-│   ├── Stablecoin.sol            ← Pragma updated
+│   ├── CreditCoinUSD.sol         ← Pragma updated
 │   ├── PushOracle.sol            ← Pragma updated
 │   ├── Treasury.sol              ← Pragma updated
 │   ├── VaultManager.sol          ← Pragma updated

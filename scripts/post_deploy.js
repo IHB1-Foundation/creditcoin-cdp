@@ -37,7 +37,7 @@ function extractAddresses(broadcast) {
   const out = {};
   const want = new Set([
     'WCTC',
-    'Stablecoin',
+    'CreditCoinUSD',
     'PushOracle',
     'MockOracle',
     'Treasury',
@@ -124,7 +124,7 @@ function main() {
   // Update root .env with deployed addresses
   const updatedEnv = updateEnvLines(loadEnv(envPath), {
     WCTC_ADDRESS: addrs.WCTC,
-    STABLECOIN_ADDRESS: addrs.Stablecoin,
+    STABLECOIN_ADDRESS: addrs.CreditCoinUSD,
     ORACLE_ADDRESS: addrs.PushOracle || addrs.MockOracle,
     TREASURY_ADDRESS: addrs.Treasury,
     VAULT_MANAGER_ADDRESS: addrs.VaultManager,
@@ -144,7 +144,7 @@ function main() {
     `NEXT_PUBLIC_BLOCK_EXPLORER=${explorer}`,
     '',
     `NEXT_PUBLIC_WCTC_ADDRESS=${addrs.WCTC}`,
-    `NEXT_PUBLIC_RUSD_ADDRESS=${addrs.Stablecoin}`,
+    `NEXT_PUBLIC_RUSD_ADDRESS=${addrs.CreditCoinUSD}`,
     `NEXT_PUBLIC_VAULT_MANAGER_ADDRESS=${addrs.VaultManager}`,
     `NEXT_PUBLIC_STABILITY_POOL_ADDRESS=${addrs.StabilityPool}`,
     `NEXT_PUBLIC_LIQUIDATION_ENGINE_ADDRESS=${addrs.LiquidationEngine}`,
