@@ -6,11 +6,13 @@ import { VaultCard } from '@/components/VaultCard';
 import { OpenVaultCard } from '@/components/OpenVaultCard';
 import { StabilityPoolCard } from '@/components/StabilityPoolCard';
 import { RedemptionCard } from '@/components/RedemptionCard';
+import { ConfigWarning } from '@/components/ConfigWarning';
 
 export default function Home() {
   return (
     <div className="min-h-screen">
       <Header />
+      <ConfigWarning />
 
       <main className="mx-auto max-w-6xl px-4 md:px-6 lg:px-8 py-8">
         {/* System Info */}

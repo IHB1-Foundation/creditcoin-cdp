@@ -1,5 +1,5 @@
 import { useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { VaultManagerABI } from '@/lib/abis/VaultManager';
 import { toast } from 'react-hot-toast';
 import { formatError } from '@/lib/utils';
@@ -22,6 +22,7 @@ export function useRedemptionEstimate(rUSDAmount: bigint | undefined) {
         functionName: 'redemptionFee',
       },
     ],
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: rUSDAmount !== undefined && rUSDAmount > 0,
     },
@@ -76,6 +77,7 @@ export function useRedeem() {
         abi: VaultManagerABI,
         functionName: 'redeemNative',
         args: [rUSDAmount, receiver],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));

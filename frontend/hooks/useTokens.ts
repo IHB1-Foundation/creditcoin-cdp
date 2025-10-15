@@ -1,5 +1,5 @@
 import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { ERC20ABI } from '@/lib/abis/ERC20';
 import { WCTCABI } from '@/lib/abis/WCTC';
 import { toast } from 'react-hot-toast';
@@ -10,7 +10,7 @@ import { formatError } from '@/lib/utils';
  */
 export function useTokenBalances() {
   const { address } = useAccount();
-  const { data: nativeBal } = useBalance({ address, query: { enabled: !!address } });
+  const { data: nativeBal } = useBalance({ address, chainId: creditcoinTestnet.id, query: { enabled: !!address } });
 
   const { data, isLoading, refetch } = useReadContracts({
     contracts: [
@@ -21,6 +21,7 @@ export function useTokenBalances() {
         args: address ? [address] : undefined,
       },
     ],
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address,
     },
@@ -49,6 +50,7 @@ export function useAllowances(spender: `0x${string}`) {
         args: address && spender ? [address, spender] : undefined,
       },
     ],
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address && !!spender,
     },
@@ -81,6 +83,7 @@ export function useApprove() {
         abi,
         functionName: 'approve',
         args: [spender, amount],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -114,6 +117,7 @@ export function useWrap() {
         abi: WCTCABI,
         functionName: 'wrap',
         value: amount,
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));

@@ -1,5 +1,5 @@
 import { useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { LiquidationEngineABI } from '@/lib/abis/LiquidationEngine';
 import { toast } from 'react-hot-toast';
 import { formatError } from '@/lib/utils';
@@ -21,6 +21,7 @@ export function useLiquidate() {
         abi: LiquidationEngineABI,
         functionName: 'liquidate',
         args: [vaultId],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));

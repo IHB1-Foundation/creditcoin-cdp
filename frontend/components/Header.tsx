@@ -7,7 +7,7 @@ import { useTokenBalances } from '@/hooks/useTokens';
 import { useInterestStats, useUserVaults } from '@/hooks/useVault';
 import { useReadContract } from 'wagmi';
 import { useEffect, useState } from 'react';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { VaultManagerABI } from '@/lib/abis/VaultManager';
 import { Tooltip } from './ui/Tooltip';
 import { formatBigInt } from '@/lib/utils';
@@ -49,6 +49,7 @@ export function Header() {
     abi: VaultManagerABI,
     functionName: 'getVaultInterest',
     args: selectedVaultId !== undefined ? [selectedVaultId] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!selectedVaultId,
     },

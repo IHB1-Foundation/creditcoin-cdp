@@ -5,6 +5,7 @@ import { injected } from 'wagmi/connectors';
 // Configure Wagmi
 export const config = createConfig({
   chains: [creditcoinTestnet],
+  batch: { multicall: false },
   connectors: [
     injected({
       // Broader detection (MetaMask and other injected wallets)

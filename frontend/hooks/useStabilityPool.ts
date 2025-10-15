@@ -1,5 +1,5 @@
 import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { StabilityPoolABI } from '@/lib/abis/StabilityPool';
 import { toast } from 'react-hot-toast';
 import { formatError } from '@/lib/utils';
@@ -24,6 +24,7 @@ export function useStabilityPoolData() {
         functionName: 'getTotalDeposits',
       },
     ],
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address,
     },
@@ -57,6 +58,7 @@ export function useStabilityDeposit() {
         abi: StabilityPoolABI,
         functionName: 'deposit',
         args: [amount],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -90,6 +92,7 @@ export function useStabilityWithdraw() {
         abi: StabilityPoolABI,
         functionName: 'withdraw',
         args: [amount],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -122,6 +125,7 @@ export function useClaimCollateralGain() {
         address: CONTRACTS.STABILITY_POOL,
         abi: StabilityPoolABI,
         functionName: 'withdrawCollateralGain',
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));

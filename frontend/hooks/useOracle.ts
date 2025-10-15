@@ -1,5 +1,5 @@
 import { useReadContracts } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { PushOracleABI } from '@/lib/abis/PushOracle';
 
 /**
@@ -24,6 +24,7 @@ export function useOracle() {
         functionName: 'lastUpdateTime',
       },
     ],
+    chainId: creditcoinTestnet.id,
     allowFailure: true,
   });
 

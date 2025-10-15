@@ -1,5 +1,5 @@
 import { useAccount, useReadContract, useReadContracts, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
-import { CONTRACTS } from '@/lib/config';
+import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { VaultManagerABI } from '@/lib/abis/VaultManager';
 import { toast } from 'react-hot-toast';
 import { formatError } from '@/lib/utils';
@@ -22,6 +22,7 @@ export function useUserVaults() {
     abi: VaultManagerABI,
     functionName: 'getUserVaults',
     args: address ? [address] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address,
     },
@@ -39,6 +40,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     abi: VaultManagerABI,
     functionName: 'getVaultBasic',
     args: vaultId !== undefined ? [vaultId] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: vaultId !== undefined,
     },
@@ -49,6 +51,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     abi: VaultManagerABI,
     functionName: 'getVaultCollateralRatio',
     args: vaultId !== undefined ? [vaultId] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: vaultId !== undefined && vaultBasic !== undefined,
     },
@@ -59,6 +62,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     abi: VaultManagerABI,
     functionName: 'canLiquidate',
     args: vaultId !== undefined ? [vaultId] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: vaultId !== undefined && vaultBasic !== undefined,
     },
@@ -69,6 +73,7 @@ export function useVaultData(vaultId: bigint | undefined) {
     abi: VaultManagerABI,
     functionName: 'getVaultInterest',
     args: vaultId !== undefined ? [vaultId] : undefined,
+    chainId: creditcoinTestnet.id,
     query: {
       enabled: vaultId !== undefined,
     },
@@ -103,6 +108,7 @@ export function useOpenVault() {
         functionName: 'openVaultNative',
         args: [debtAmount, interestRate],
         value: collateralAmount,
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -139,6 +145,7 @@ export function useAdjustVault() {
           functionName: 'depositCollateralNative',
           args: [vaultId],
           value: collateralDelta,
+          chainId: creditcoinTestnet.id,
         });
       } else if (collateralDelta < 0n) {
         await writeContract({
@@ -146,6 +153,7 @@ export function useAdjustVault() {
           abi: VaultManagerABI,
           functionName: 'withdrawCollateralNative',
           args: [vaultId, BigInt(-collateralDelta)],
+          chainId: creditcoinTestnet.id,
         });
       }
       if (debtDelta !== 0n) {
@@ -154,6 +162,7 @@ export function useAdjustVault() {
           abi: VaultManagerABI,
           functionName: 'adjustVault',
           args: [vaultId, 0n, debtDelta],
+          chainId: creditcoinTestnet.id,
         });
       }
     } catch (err: any) {
@@ -188,6 +197,7 @@ export function useCloseVault() {
         abi: VaultManagerABI,
         functionName: 'closeVaultNative',
         args: [vaultId],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -218,6 +228,7 @@ export function useUpdateInterest() {
         abi: VaultManagerABI,
         functionName: 'updateInterestRate',
         args: [vaultId, newRate],
+        chainId: creditcoinTestnet.id,
       });
     } catch (err: any) {
       toast.error(formatError(err));
@@ -276,6 +287,7 @@ export function useProtocolParams() {
         functionName: 'getTotalDebtCurrent',
       },
     ],
+    chainId: creditcoinTestnet.id,
   });
 
   return {
@@ -298,6 +310,7 @@ export function useInterestStats() {
     address: CONTRACTS.VAULT_MANAGER,
     abi: VaultManagerABI,
     functionName: 'getInterestStats',
+    chainId: creditcoinTestnet.id,
   });
 
   // data is tuple [minRate, maxRate, avgRate, count]
