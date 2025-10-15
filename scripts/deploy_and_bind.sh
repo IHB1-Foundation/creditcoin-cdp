@@ -98,6 +98,120 @@ forge script script/Deploy.s.sol \
   $EXTRA_ARGS
 
 echo "[deploy_and_bind] Binding deployment to frontend..."
-node scripts/post_deploy.js
+
+# Inline post-deploy binding logic (no external file dependency)
+node <<'NODE'
+const fs = require('fs');
+const path = require('path');
+
+function readJSON(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
+function writeFile(p, data) { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); }
+
+function findBroadcastFile(root, chainId) {
+  const p = path.join(root, 'broadcast', 'Deploy.s.sol', String(chainId), 'run-latest.json');
+  if (!fs.existsSync(p)) {
+    throw new Error(`Broadcast file not found: ${p}. Did forge script run with --broadcast?`);
+  }
+  return p;
+}
+
+function extractAddresses(broadcast) {
+  const out = {};
+  const want = new Set([
+    'WCTC',
+    'CreditCoinUSD',
+    'PushOracle',
+    'MockOracle',
+    'Treasury',
+    'VaultManager',
+    'StabilityPool',
+    'LiquidationEngine',
+  ]);
+  const txs = Array.isArray(broadcast.transactions) ? broadcast.transactions : [];
+  for (let i = 0; i < txs.length; i++) {
+    const t = txs[i];
+    const name = t.contractName || t.contract || t.name;
+    if (!name || !want.has(name)) continue;
+    let addr = t.contractAddress || t.address;
+    if (!addr && Array.isArray(broadcast.receipts) && broadcast.receipts[i]) {
+      addr = broadcast.receipts[i].contractAddress;
+    }
+    if (addr && /^0x[0-9a-fA-F]{40}$/.test(addr)) out[name] = addr;
+  }
+  const missing = [...want].filter((k) => !out[k]);
+  if (missing.length) throw new Error(`Could not find deployed addresses for: ${missing.join(', ')}`);
+  return out;
+}
+
+function loadEnv(filepath) {
+  return fs.readFileSync(filepath, 'utf8').split(/\r?\n/);
+}
+function updateEnvLines(lines, updates) {
+  const keys = Object.keys(updates); const seen = new Set();
+  const out = lines.map((line) => {
+    const m = line.match(/^([A-Z0-9_]+)=(.*)$/); if (!m) return line;
+    const key = m[1]; if (updates.hasOwnProperty(key)) { seen.add(key); return `${key}=${updates[key]}`; }
+    return line;
+  });
+  for (const k of keys) if (!seen.has(k)) out.push(`${k}=${updates[k]}`);
+  return out.join('\n') + '\n';
+}
+
+function main() {
+  const root = process.cwd();
+  const envPath = path.join(root, '.env');
+  if (!fs.existsSync(envPath)) throw new Error('Missing .env at repo root');
+  const envContent = fs.readFileSync(envPath, 'utf8');
+  const envMap = Object.fromEntries(
+    envContent.split(/\r?\n/)
+      .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/))
+      .filter(Boolean)
+      .map((m) => [m[1], m[2]])
+  );
+  const chainId = envMap.CHAIN_ID || process.env.CHAIN_ID;
+  const rpcUrl = envMap.RPC_URL || process.env.RPC_URL || '';
+  const chainName = process.env.NEXT_PUBLIC_CHAIN_NAME || 'CreditCoin Testnet';
+  const explorer = process.env.NEXT_PUBLIC_BLOCK_EXPLORER || 'https://explorer.creditcoin.org';
+  if (!chainId) throw new Error('CHAIN_ID not set in .env');
+
+  const broadcastPath = findBroadcastFile(root, chainId);
+  const broadcast = readJSON(broadcastPath);
+  const addrs = extractAddresses(broadcast);
+
+  // Update root .env with deployed addresses
+  const updatedEnv = updateEnvLines(loadEnv(envPath), {
+    WCTC_ADDRESS: addrs.WCTC,
+    STABLECOIN_ADDRESS: addrs.CreditCoinUSD,
+    ORACLE_ADDRESS: addrs.PushOracle || addrs.MockOracle,
+    TREASURY_ADDRESS: addrs.Treasury,
+    VAULT_MANAGER_ADDRESS: addrs.VaultManager,
+    STABILITY_POOL_ADDRESS: addrs.StabilityPool,
+    LIQUIDATION_ENGINE_ADDRESS: addrs.LiquidationEngine,
+  });
+  writeFile(envPath, updatedEnv);
+
+  // Write frontend/.env.local
+  const frontendEnv = [
+    `NEXT_PUBLIC_CHAIN_ID=${chainId}`,
+    `NEXT_PUBLIC_CHAIN_NAME=${JSON.stringify(chainName)}`,
+    `NEXT_PUBLIC_RPC_URL=${rpcUrl}`,
+    `NEXT_PUBLIC_BLOCK_EXPLORER=${explorer}`,
+    '',
+    `NEXT_PUBLIC_WCTC_ADDRESS=${addrs.WCTC}`,
+    `NEXT_PUBLIC_RUSD_ADDRESS=${addrs.CreditCoinUSD}`,
+    `NEXT_PUBLIC_VAULT_MANAGER_ADDRESS=${addrs.VaultManager}`,
+    `NEXT_PUBLIC_STABILITY_POOL_ADDRESS=${addrs.StabilityPool}`,
+    `NEXT_PUBLIC_LIQUIDATION_ENGINE_ADDRESS=${addrs.LiquidationEngine}`,
+    `NEXT_PUBLIC_ORACLE_ADDRESS=${addrs.PushOracle || addrs.MockOracle}`,
+    `NEXT_PUBLIC_TREASURY_ADDRESS=${addrs.Treasury}`,
+    '',
+  ].join('\n');
+  writeFile(path.join(root, 'frontend', '.env.local'), frontendEnv);
+
+  console.log('[deploy_and_bind] Updated .env and wrote frontend/.env.local');
+}
+
+try { main(); } catch (e) { console.error('[deploy_and_bind] Error:', e.message || e); process.exit(1); }
+NODE
 
 echo "[deploy_and_bind] Done. Frontend env written to frontend/.env.local"

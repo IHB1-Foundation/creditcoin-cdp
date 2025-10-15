@@ -23,13 +23,23 @@ export function useOracle() {
         abi: PushOracleABI,
         functionName: 'lastUpdateTime',
       },
+      {
+        // Fallback to raw stored price if getPrice() reverts due to staleness
+        address: CONTRACTS.ORACLE,
+        abi: PushOracleABI,
+        functionName: 'price',
+      },
     ],
     chainId: creditcoinTestnet.id,
     allowFailure: true,
   });
 
   return {
-    price: (data?.[0]?.result as bigint | undefined) ?? (data?.[0]?.status === 'success' ? (data?.[0]?.result as bigint) : undefined),
+    price:
+      // Prefer fresh price
+      (data?.[0]?.status === 'success' ? (data?.[0]?.result as bigint) : undefined) ??
+      // Fallback to stored price even if stale
+      (data?.[3]?.status === 'success' ? (data?.[3]?.result as bigint) : undefined),
     isFresh: data?.[1]?.result as boolean | undefined,
     lastUpdateTime: data?.[2]?.result as bigint | undefined,
     isLoading,
