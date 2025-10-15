@@ -285,7 +285,7 @@ Redeemer
   │
 VaultManager
   │
-  ├─► 3. Sort vaults by collateral ratio (lowest first)
+  ├─► 3. Order vaults by APR (lowest first)
   │
   ├─► 4. For each vault (starting with riskiest):
   │     ├─► Skip if below MCR (liquidatable)

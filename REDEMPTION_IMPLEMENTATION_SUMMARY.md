@@ -122,10 +122,14 @@ redemptionFee = 5e15; // Default 0.5%
 
 ### 2. Targeting Logic Tests
 
-✅ **testRedemptionTargetsLowestCR**
-- Creates vaults with different CRs
-- Verifies lowest CR vault is targeted first
-- Confirms higher CR vaults are untouched
+✅ **testRedemptionTargetsLowestInterest**
+- Creates vaults with different APRs
+- Verifies lowest APR vault is targeted first
+- Confirms higher APR vaults are skipped when capped
+
+✅ **testRedemptionTieBreaksOnDebtWhenAprEqual**
+- Creates equal-APR vaults with different debts
+- Verifies larger-debt vault is redeemed first by default
 
 ✅ **testRedemptionSkipsLiquidatableVaults**
 - Creates healthy and liquidatable vaults

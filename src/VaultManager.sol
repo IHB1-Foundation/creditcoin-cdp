@@ -322,14 +322,13 @@ contract VaultManager {
         // Check minimum debt requirement (unless closing)
         if (newDebt > 0 && newDebt < MIN_DEBT) revert DebtTooLow();
 
-        // Get current price
-        uint256 price = oracle.getPrice();
-
-        // Check collateral ratio if debt remains
-        if (newDebt > 0) {
+        // Only enforce collateral ratio checks when the change reduces safety:
+        // - increasing debt or
+        // - decreasing collateral.
+        if (newDebt > 0 && (newDebt > vault.debt || newCollateral < vault.collateral)) {
+            uint256 price = oracle.getPrice();
             uint256 collateralValue = (newCollateral * price) / PRECISION;
             uint256 requiredCollateral = (newDebt * minCollateralRatio) / PRECISION;
-
             if (collateralValue < requiredCollateral) revert InsufficientCollateralRatio();
         }
 
@@ -666,8 +665,8 @@ contract VaultManager {
             vault.debt -= debtToRedeem;
             vault.timestamp = block.timestamp;
 
-            // Close if below min debt
-            if (vault.debt > 0 && vault.debt < MIN_DEBT) {
+            // Close if debt is at or below minimum threshold (including zero)
+            if (vault.debt <= MIN_DEBT) {
                 if (vault.collateral > 0) {
                     if (!collateralToken.transfer(vault.owner, vault.collateral)) {
                         revert TransferFailed();
@@ -784,7 +783,7 @@ contract VaultManager {
             vault.debt -= debtToRedeem;
             vault.timestamp = block.timestamp;
 
-            if (vault.debt > 0 && vault.debt < MIN_DEBT) {
+            if (vault.debt <= MIN_DEBT) {
                 if (vault.collateral > 0) {
                     if (!collateralToken.transfer(vault.owner, vault.collateral)) revert TransferFailed();
                     totalCollateral -= vault.collateral;

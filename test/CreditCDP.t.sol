@@ -199,11 +199,11 @@ contract CreditCDPTest is Test {
         uint256 bobVault = vaultManager.openVault(20 ether, 10_000e18, 0.08e18);
         vm.stopPrank();
 
-        // Charlie gets crdUSD to redeem
+        // Charlie gets crdUSD to redeem; set APR high so his own vault is not targeted
         vm.startPrank(charlie);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
-        vaultManager.openVault(30 ether, 5_000e18);
+        vaultManager.openVault(30 ether, 5_000e18, 0.10e18);
 
         // Read debts before
         uint256 aliceDebtBefore = vaultManager.getVault(aliceVault).debt;
@@ -235,11 +235,11 @@ contract CreditCDPTest is Test {
         uint256 bobVault = vaultManager.openVault(10 ether, 5_000e18, 0.08e18);
         vm.stopPrank();
 
-        // Charlie funds redemption
+        // Charlie funds redemption; set APR high so his own vault is not targeted
         vm.startPrank(charlie);
         wctc.wrap{value: 20 ether}();
         wctc.approve(address(vaultManager), 20 ether);
-        vaultManager.openVault(20 ether, 5_000e18);
+        vaultManager.openVault(20 ether, 5_000e18, 0.10e18);
 
         uint256 aliceBefore = vaultManager.getVault(aliceVault).debt;
         uint256 bobBefore = vaultManager.getVault(bobVault).debt;
@@ -265,11 +265,11 @@ contract CreditCDPTest is Test {
         uint256 vLarge = vaultManager.openVault(10 ether, 7_000e18, 0.03e18); // larger debt
         vm.stopPrank();
 
-        // Fund redeemer
+        // Fund redeemer; set APR high so his own vault is not targeted
         vm.startPrank(bob);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
-        vaultManager.openVault(30 ether, 5_000e18);
+        vaultManager.openVault(30 ether, 5_000e18, 0.10e18);
 
         uint256 smallBefore = vaultManager.getVault(vSmall).debt;
         uint256 largeBefore = vaultManager.getVault(vLarge).debt;
@@ -521,8 +521,10 @@ contract CreditCDPTest is Test {
         // 10 wCTC * $2000 = $20,000, borrowing $14,000 gives ~140% CR
         uint256 vaultId = _openVaultForAlice(10 ether, 14_000e18);
 
-        // Bob gets crdUSD to redeem
-        _openVaultForBob(20 ether, 20_000e18);
+        // Bob gets crdUSD to redeem; set his APR high so his own vault is not targeted
+        uint256 bobFundingVault = _openVaultForBob(20 ether, 20_000e18);
+        vm.prank(bob);
+        vaultManager.updateInterestRate(bobFundingVault, 0.10e18);
 
         vm.startPrank(bob);
 
@@ -562,13 +564,13 @@ contract CreditCDPTest is Test {
         // Bob opens vault with 160% CR (safer)
         uint256 vaultId2 = _openVaultForBob(10 ether, 12_000e18);
 
-        // Charlie gets crdUSD to redeem
+        // Charlie gets crdUSD to redeem; set APR high so his own vault is not targeted
         vm.startPrank(charlie);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
-        vaultManager.openVault(30 ether, 30_000e18);
+        vaultManager.openVault(30 ether, 30_000e18, 0.10e18);
 
-        // Charlie redeems a large amount that requires hitting both vaults
+        // Charlie redeems a large amount that requires hitting multiple vaults
         uint256 redemptionAmount = 20_000e18;
         rusd.approve(address(vaultManager), redemptionAmount);
 
@@ -577,9 +579,12 @@ contract CreditCDPTest is Test {
         // Should have received collateral
         assertTrue(collateralReceived > 9.9 ether && collateralReceived < 10.1 ether);
 
-        // Alice's vault (riskier) should be hit first and possibly fully redeemed
-        VaultManager.Vault memory vault1 = vaultManager.getVault(vaultId1);
-        assertTrue(vault1.debt < 14_070e18); // Should be reduced or closed
+        // Alice's vault (riskier/lower APR) should be hit first; it may be reduced or closed
+        try vaultManager.getVault(vaultId1) returns (VaultManager.Vault memory v1) {
+            assertTrue(v1.debt < 14_070e18);
+        } catch {
+            // Closed is acceptable
+        }
 
         // Bob's vault should also be affected
         VaultManager.Vault memory vault2 = vaultManager.getVault(vaultId2);
@@ -588,43 +593,43 @@ contract CreditCDPTest is Test {
         vm.stopPrank();
     }
 
-    function testRedemptionTargetsLowestCR() public {
-        // Create vaults with different collateral ratios
-        // Alice: 140% CR (riskiest)
-        uint256 vaultId1 = _openVaultForAlice(10 ether, 14_000e18);
-
-        // Bob: 180% CR (safer)
-        uint256 vaultId2 = _openVaultForBob(15 ether, 16_000e18);
+    function testRedemptionTieBreaksOnDebtWhenAprEqual() public {
+        // Two vaults with same APR (default), different debts and CRs
+        // Alice: ~140% CR, debt ~14k
+        uint256 aliceVault = _openVaultForAlice(10 ether, 14_000e18);
+        // Bob: higher CR, larger debt ~16k
+        uint256 bobVault = _openVaultForBob(15 ether, 16_000e18);
 
         // Record initial debts
-        uint256 aliceDebtBefore = vaultManager.getVault(vaultId1).debt;
-        uint256 bobDebtBefore = vaultManager.getVault(vaultId2).debt;
+        uint256 aliceDebtBefore = vaultManager.getVault(aliceVault).debt;
+        uint256 bobDebtBefore = vaultManager.getVault(bobVault).debt;
 
-        // Charlie redeems small amount
+        // Charlie redeems a small amount; with equal APRs, larger debt is prioritized
         vm.startPrank(charlie);
         wctc.wrap{value: 20 ether}();
         wctc.approve(address(vaultManager), 20 ether);
-        vaultManager.openVault(20 ether, 20_000e18);
+        vaultManager.openVault(20 ether, 20_000e18, 0.10e18);
 
-        rusd.approve(address(vaultManager), 5000e18);
-        vaultManager.redeem(5000e18, charlie);
+        rusd.approve(address(vaultManager), 5_000e18);
+        vaultManager.redeem(5_000e18, charlie);
         vm.stopPrank();
 
-        // Alice's vault should be hit (lower CR)
-        uint256 aliceDebtAfter = vaultManager.getVault(vaultId1).debt;
-        assertTrue(aliceDebtAfter < aliceDebtBefore);
-
-        // Bob's vault should be unchanged (higher CR, not targeted)
-        uint256 bobDebtAfter = vaultManager.getVault(vaultId2).debt;
-        assertEq(bobDebtAfter, bobDebtBefore);
+        uint256 aliceDebtAfter = vaultManager.getVault(aliceVault).debt;
+        uint256 bobDebtAfter = vaultManager.getVault(bobVault).debt;
+        // Expect Bob (larger debt) to be redeemed before Alice when APRs equal
+        assertTrue(bobDebtAfter < bobDebtBefore, "larger-debt vault should be redeemed first on APR tie");
+        // Alice may be unchanged or reduced if redemption spills over
+        assertTrue(aliceDebtAfter <= aliceDebtBefore, "smaller-debt vault should not increase");
     }
 
     function testRedemptionFeeCalculation() public {
         // Alice opens vault
         _openVaultForAlice(10 ether, 10_000e18);
 
-        // Bob gets crdUSD
-        _openVaultForBob(20 ether, 10_000e18);
+        // Bob gets crdUSD; set APR high so his own vault is not targeted
+        uint256 bobFundVault = _openVaultForBob(20 ether, 10_000e18);
+        vm.prank(bob);
+        vaultManager.updateInterestRate(bobFundVault, 0.10e18);
 
         vm.startPrank(bob);
 
@@ -653,16 +658,17 @@ contract CreditCDPTest is Test {
         // Bob opens vault that will become liquidatable
         uint256 vaultId2 = _openVaultForBob(10 ether, 15_000e18);
 
-        // Charlie opens vault to get crdUSD for redemption
+        // Charlie opens vault to get crdUSD for redemption; set APR high so his own vault is not targeted
         vm.startPrank(charlie);
         wctc.wrap{value: 30 ether}();
         wctc.approve(address(vaultManager), 30 ether);
-        vaultManager.openVault(30 ether, 10_000e18);
+        vaultManager.openVault(30 ether, 10_000e18, 0.10e18);
         vm.stopPrank();
 
-        // Price drop makes Bob's vault liquidatable
-        // 10 wCTC * $1200 = $12,000, debt ~$15,075 -> CR = 79% < 130%
-        oracle.setPrice(1200e18, block.timestamp);
+        // Price drop makes Bob's vault liquidatable while Alice remains healthy
+        // At $1900: Alice CR = (10*$1900)/$14,070 ≈ 135% (healthy)
+        //            Bob CR = (10*$1900)/$15,075 ≈ 126% (liquidatable)
+        oracle.setPrice(1900e18, block.timestamp);
 
         // Verify Bob's vault is liquidatable
         assertTrue(vaultManager.canLiquidate(vaultId2));
@@ -704,12 +710,13 @@ contract CreditCDPTest is Test {
         vm.startPrank(bob);
         wctc.wrap{value: 100 ether}();
         wctc.approve(address(vaultManager), 100 ether);
-        vaultManager.openVault(100 ether, 50_000e18);
+        vaultManager.openVault(100 ether, 50_000e18, 0.10e18);
 
-        // Bob redeems almost all of Alice's debt, leaving it below MIN_DEBT (100 crdUSD)
-        // Alice's debt is ~$14,070 (including fee), redeeming $14,050 leaves ~$20 which is below MIN_DEBT
-        rusd.approve(address(vaultManager), 14_050e18);
-        vaultManager.redeem(14_050e18, bob);
+        // Bob fully redeems Alice's debt to trigger closure (now closes on <= MIN_DEBT)
+        // Alice's stored debt is ~$14,070 (including fee)
+        rusd.approve(address(vaultManager), 14_070e18);
+        // Cap APR to ensure Bob's own 10% APR vault is skipped
+        vaultManager.redeemWithCap(14_070e18, bob, 0.06e18);
 
         vm.stopPrank();
 
@@ -738,8 +745,10 @@ contract CreditCDPTest is Test {
         // Open vault
         _openVaultForAlice(10 ether, 10_000e18);
 
-        // Bob gets crdUSD
-        _openVaultForBob(20 ether, 10_000e18);
+        // Bob gets crdUSD; set APR high so his own vault is not targeted
+        uint256 bobFundingVault2 = _openVaultForBob(20 ether, 10_000e18);
+        vm.prank(bob);
+        vaultManager.updateInterestRate(bobFundingVault2, 0.10e18);
 
         vm.startPrank(bob);
 

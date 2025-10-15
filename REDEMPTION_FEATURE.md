@@ -16,9 +16,11 @@ The redemption mechanism allows crdUSD holders to burn their stablecoins in exch
 
 ### Vault Selection Algorithm
 
-Redemptions target vaults in ascending order of collateral ratio:
-- **Lowest CR first**: Vaults closest to the Minimum Collateral Ratio (MCR) are redeemed from first
+Redemptions target vaults by borrower APR (Liquity V2-style):
+- **Lowest APR first**: Vaults with the lowest borrower interest rate are redeemed from first
 - **Skips liquidatable vaults**: Vaults below MCR are excluded from redemption
+- **APR cap (optional)**: `redeemWithCap` skips vaults above a specified `maxInterestRate`
+- **Tie-breakers**: When APRs are equal, default path prefers larger debts first; `redeemAdvanced` supports preferring smaller debts instead
 - **Multi-vault redemption**: Large redemptions can span multiple vaults
 
 ### Example Redemption
@@ -30,7 +32,7 @@ Redemptions target vaults in ascending order of collateral ratio:
 - Redemption fee: 0.5%
 
 **User redeems 5,000 crdUSD**:
-1. Protocol targets Vault A (lowest CR)
+1. Protocol targets the lowest APR vault(s)
 2. Calculates collateral needed: 5,000 / 2,000 = 2.5 wCTC
 3. Applies fee: 2.5 * 0.5% = 0.0125 wCTC fee
 4. User receives: 2.5 - 0.0125 = 2.4875 wCTC
@@ -214,14 +216,16 @@ The redemption feature includes comprehensive tests:
 
 1. ✅ **testRedemptionSingleVault**: Basic redemption from one vault
 2. ✅ **testRedemptionMultipleVaults**: Redemption spanning multiple vaults
-3. ✅ **testRedemptionTargetsLowestCR**: Verifies correct vault targeting
-4. ✅ **testRedemptionFeeCalculation**: Fee calculation accuracy
-5. ✅ **testRedemptionSkipsLiquidatableVaults**: Skips unhealthy vaults
-6. ✅ **testRedemptionRevertsOnZeroAmount**: Zero amount validation
-7. ✅ **testRedemptionRevertsOnZeroAddress**: Zero address validation
-8. ✅ **testRedemptionClosesVaultBelowMinDebt**: Auto-closure behavior
-9. ✅ **testSetRedemptionFee**: Admin fee updates
-10. ✅ **testRedemptionEstimateAccuracy**: Estimate function accuracy
+3. ✅ **testRedemptionTargetsLowestInterest**: Verifies APR-ordered targeting
+4. ✅ **testRedeemWithCapSkipsHighAPR**: Skips vaults above max APR
+5. ✅ **testTieBreakPreference**: APR-equal tie-break (larger vs smaller debt)
+6. ✅ **testRedemptionFeeCalculation**: Fee calculation accuracy
+7. ✅ **testRedemptionSkipsLiquidatableVaults**: Skips unhealthy vaults
+8. ✅ **testRedemptionRevertsOnZeroAmount**: Zero amount validation
+9. ✅ **testRedemptionRevertsOnZeroAddress**: Zero address validation
+10. ✅ **testRedemptionClosesVaultBelowMinDebt**: Auto-closure behavior
+11. ✅ **testSetRedemptionFee**: Admin fee updates
+12. ✅ **testRedemptionEstimateAccuracy**: Estimate function accuracy
 
 All tests pass with Solidity 0.8.7 and London EVM compatibility.
 
@@ -241,9 +245,9 @@ All tests pass with Solidity 0.8.7 and London EVM compatibility.
 
 ### Vault Ordering Efficiency
 
-- Current implementation: O(n²) bubble sort
-- Acceptable for MVP with small vault count
-- Consider upgrading to sorted tree for production
+- Current implementation: Heap-based selection (O(n log n)) per redemption
+- Acceptable for MVP with small-to-medium vault count
+- Consider maintaining an on-chain sorted structure for O(log n) insert/remove
 
 ### Front-Running Considerations
 
@@ -266,7 +270,7 @@ All tests pass with Solidity 0.8.7 and London EVM compatibility.
 ## Comparison with Liquity V2
 
 **Similarities**:
-- Targets lowest CR vaults first
+- Targets lowest APR vaults first
 - Burns stablecoin, returns collateral
 - Applies redemption fee
 - Skips liquidatable vaults
