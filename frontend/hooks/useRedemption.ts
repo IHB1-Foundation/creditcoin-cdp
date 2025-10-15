@@ -15,14 +15,15 @@ export function useRedemptionEstimate(rUSDAmount: bigint | undefined) {
         abi: VaultManagerABI,
         functionName: 'getRedeemableAmount',
         args: rUSDAmount ? [rUSDAmount] : undefined,
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'redemptionFee',
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
     query: {
       enabled: rUSDAmount !== undefined && rUSDAmount > 0,
     },

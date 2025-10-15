@@ -12,25 +12,28 @@ export function useOracle() {
         address: CONTRACTS.ORACLE,
         abi: PushOracleABI,
         functionName: 'getPrice',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.ORACLE,
         abi: PushOracleABI,
         functionName: 'isFresh',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.ORACLE,
         abi: PushOracleABI,
         functionName: 'lastUpdateTime',
+        chainId: creditcoinTestnet.id,
       },
       {
         // Fallback to raw stored price if getPrice() reverts due to staleness
         address: CONTRACTS.ORACLE,
         abi: PushOracleABI,
         functionName: 'price',
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
     allowFailure: true,
   });
 

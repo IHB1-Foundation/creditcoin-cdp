@@ -19,9 +19,9 @@ export function useTokenBalances() {
         abi: ERC20ABI,
         functionName: 'balanceOf',
         args: address ? [address] : undefined,
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address,
     },
@@ -48,9 +48,9 @@ export function useAllowances(spender: `0x${string}`) {
         abi: ERC20ABI,
         functionName: 'allowance',
         args: address && spender ? [address, spender] : undefined,
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address && !!spender,
     },

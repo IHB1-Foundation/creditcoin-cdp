@@ -17,14 +17,15 @@ export function useStabilityPoolData() {
         abi: StabilityPoolABI,
         functionName: 'getDepositorInfo',
         args: address ? [address] : undefined,
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.STABILITY_POOL,
         abi: StabilityPoolABI,
         functionName: 'getTotalDeposits',
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
     query: {
       enabled: !!address,
     },

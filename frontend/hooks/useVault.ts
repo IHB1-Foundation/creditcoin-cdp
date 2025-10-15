@@ -255,39 +255,45 @@ export function useProtocolParams() {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'minCollateralRatio',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'liquidationRatio',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'borrowingFee',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'redemptionFee',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'totalDebt',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'totalCollateral',
+        chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.VAULT_MANAGER,
         abi: VaultManagerABI,
         functionName: 'getTotalDebtCurrent',
+        chainId: creditcoinTestnet.id,
       },
     ],
-    chainId: creditcoinTestnet.id,
   });
 
   return {
