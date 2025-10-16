@@ -60,7 +60,8 @@ else
   echo "[deploy_and_bind] Skipping RPC preflight by request (SKIP_PREFLIGHT=$SKIP_PREFLIGHT)"
 fi
 
-echo "[deploy_and_bind] Building contracts..."
+echo "[deploy_and_bind] Cleaning and building contracts..."
+forge clean >/dev/null 2>&1 || true
 forge build > /dev/null
 
 echo "[deploy_and_bind] Deploying via forge script to chain ${CHAIN_ID}..."
@@ -108,11 +109,14 @@ function readJSON(p) { return JSON.parse(fs.readFileSync(p, 'utf8')); }
 function writeFile(p, data) { fs.mkdirSync(path.dirname(p), { recursive: true }); fs.writeFileSync(p, data); }
 
 function findBroadcastFile(root, chainId) {
-  const p = path.join(root, 'broadcast', 'Deploy.s.sol', String(chainId), 'run-latest.json');
-  if (!fs.existsSync(p)) {
-    throw new Error(`Broadcast file not found: ${p}. Did forge script run with --broadcast?`);
-  }
-  return p;
+  const dir = path.join(root, 'broadcast', 'Deploy.s.sol', String(chainId));
+  const latest = path.join(dir, 'run-latest.json');
+  if (fs.existsSync(latest)) return latest;
+  if (!fs.existsSync(dir)) throw new Error(`Broadcast dir not found: ${dir}`);
+  const files = fs.readdirSync(dir).filter(f => /^run-.*\.json$/.test(f));
+  if (!files.length) throw new Error(`No broadcast files found in ${dir}. Did forge script run with --broadcast?`);
+  files.sort((a,b)=> fs.statSync(path.join(dir,b)).mtimeMs - fs.statSync(path.join(dir,a)).mtimeMs);
+  return path.join(dir, files[0]);
 }
 
 function extractAddresses(broadcast) {
@@ -120,7 +124,6 @@ function extractAddresses(broadcast) {
   const want = new Set([
     'WCTC',
     'CreditCoinUSD',
-    'PushOracle',
     'MockOracle',
     'Treasury',
     'VaultManager',
@@ -182,7 +185,7 @@ function main() {
   const updatedEnv = updateEnvLines(loadEnv(envPath), {
     WCTC_ADDRESS: addrs.WCTC,
     STABLECOIN_ADDRESS: addrs.CreditCoinUSD,
-    ORACLE_ADDRESS: addrs.PushOracle || addrs.MockOracle,
+    ORACLE_ADDRESS: addrs.MockOracle,
     TREASURY_ADDRESS: addrs.Treasury,
     VAULT_MANAGER_ADDRESS: addrs.VaultManager,
     STABILITY_POOL_ADDRESS: addrs.StabilityPool,
@@ -202,7 +205,7 @@ function main() {
     `NEXT_PUBLIC_VAULT_MANAGER_ADDRESS=${addrs.VaultManager}`,
     `NEXT_PUBLIC_STABILITY_POOL_ADDRESS=${addrs.StabilityPool}`,
     `NEXT_PUBLIC_LIQUIDATION_ENGINE_ADDRESS=${addrs.LiquidationEngine}`,
-    `NEXT_PUBLIC_ORACLE_ADDRESS=${addrs.PushOracle || addrs.MockOracle}`,
+    `NEXT_PUBLIC_ORACLE_ADDRESS=${addrs.MockOracle}`,
     `NEXT_PUBLIC_TREASURY_ADDRESS=${addrs.Treasury}`,
     '',
   ].join('\n');

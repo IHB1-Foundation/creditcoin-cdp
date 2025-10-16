@@ -29,10 +29,10 @@ contract VaultManager {
     uint256 private constant SECONDS_PER_YEAR = 365 days;
 
     // Contract references
-    IERC20 public immutable collateralToken;    // wCTC
-    IStablecoin public immutable stablecoin;    // crdUSD
-    IPushOracle public immutable oracle;        // Price oracle
-    ITreasury public immutable treasury;        // Fee collection
+    IERC20 public collateralToken;    // wCTC
+    IStablecoin public stablecoin;    // crdUSD
+    IPushOracle public oracle;        // Price oracle
+    ITreasury public treasury;        // Fee collection
 
     // Parameters
     uint256 public minCollateralRatio;          // e.g., 1.3e18 = 130% (borrow constraint)
@@ -109,7 +109,15 @@ contract VaultManager {
     // =============================================================
 
     /**
-     * @notice Initialize the VaultManager
+     * @notice Constructor: sets owner and initializes counters
+     */
+    constructor() {
+        owner = msg.sender;
+        nextVaultId = 1; // Start vault IDs at 1
+    }
+
+    /**
+     * @notice Initialize core dependencies and parameters (one-time)
      * @param _collateralToken wCTC token address
      * @param _stablecoin crdUSD token address
      * @param _oracle Price oracle address
@@ -117,14 +125,15 @@ contract VaultManager {
      * @param _minCollateralRatio Minimum collateral ratio (e.g., 1.3e18 = 130%)
      * @param _borrowingFee Borrowing fee percentage (e.g., 5e15 = 0.5%)
      */
-    constructor(
+    function initialize(
         address _collateralToken,
         address _stablecoin,
         address _oracle,
         address _treasury,
         uint256 _minCollateralRatio,
         uint256 _borrowingFee
-    ) {
+    ) external onlyOwner {
+        if (address(collateralToken) != address(0)) revert InvalidParameters(); // already initialized
         if (_collateralToken == address(0)) revert ZeroAddress();
         if (_stablecoin == address(0)) revert ZeroAddress();
         if (_oracle == address(0)) revert ZeroAddress();
@@ -138,13 +147,9 @@ contract VaultManager {
         treasury = ITreasury(_treasury);
 
         minCollateralRatio = _minCollateralRatio;
-        // By default, set liquidation threshold equal to MCR; owner can lower it later
-        liquidationRatio = _minCollateralRatio;
+        liquidationRatio = _minCollateralRatio; // default equals MCR; owner can adjust later
         borrowingFee = _borrowingFee;
         redemptionFee = 5e15; // Default 0.5%
-
-        owner = msg.sender;
-        nextVaultId = 1; // Start vault IDs at 1
     }
 
     // =============================================================

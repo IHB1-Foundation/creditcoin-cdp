@@ -22,8 +22,8 @@ contract StabilityPool {
     uint256 private constant PRECISION = 1e18;
 
     // Contract references
-    IStablecoin public immutable stablecoin;    // crdUSD
-    IERC20 public immutable collateralToken;    // wCTC
+    IStablecoin public stablecoin;    // crdUSD
+    IERC20 public collateralToken;    // wCTC
 
     // State
     mapping(address => Deposit) public deposits;
@@ -64,17 +64,23 @@ contract StabilityPool {
     // =============================================================
 
     /**
-     * @notice Initialize the StabilityPool
+     * @notice Initialize the StabilityPool; owner is set to deployer
+     */
+    constructor() {
+        owner = msg.sender;
+    }
+
+    /**
+     * @notice Initialize token references (one-time)
      * @param _stablecoin crdUSD token address
      * @param _collateralToken wCTC token address
      */
-    constructor(address _stablecoin, address _collateralToken) {
+    function initialize(address _stablecoin, address _collateralToken) external onlyOwner {
+        if (address(stablecoin) != address(0) || address(collateralToken) != address(0)) revert Unauthorized();
         if (_stablecoin == address(0)) revert ZeroAddress();
         if (_collateralToken == address(0)) revert ZeroAddress();
-
         stablecoin = IStablecoin(_stablecoin);
         collateralToken = IERC20(_collateralToken);
-        owner = msg.sender;
     }
 
     // =============================================================

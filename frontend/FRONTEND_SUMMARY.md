@@ -59,7 +59,7 @@ frontend/
 │       ├── StabilityPool.ts     # Pool contract ABI
 │       ├── ERC20.ts             # Standard ERC20 ABI
 │       ├── WCTC.ts              # Wrapper token ABI
-│       ├── PushOracle.ts        # Oracle contract ABI
+│       ├── MockOracle.ts        # Oracle contract ABI (Mock)
 │       └── LiquidationEngine.ts # Liquidation ABI
 │
 ├── Configuration Files
@@ -210,7 +210,7 @@ useRedeem()                   // Execute redemption
 
 **File**: `components/OracleInfo.tsx`
 
-- ✅ tCTC oracle price with freshness indicator
+- ✅ tCTC oracle price (mock) with freshness indicator
 - ✅ Last update time (time ago format)
 - ✅ Minimum Collateral Ratio (MCR)
 - ✅ Borrowing fee percentage
@@ -540,7 +540,7 @@ export const config = createConfig({
 - [ ] Oracle price used
 
 ### Error Handling
-- [ ] Stale oracle price warning
+- [ ] Stale oracle price warning (MockOracle is always fresh)
 - [ ] Insufficient balance errors
 - [ ] Approval rejections handled
 - [ ] Contract reverts displayed

@@ -1,6 +1,6 @@
 import { useReadContracts } from 'wagmi';
 import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
-import { PushOracleABI } from '@/lib/abis/PushOracle';
+import { MockOracleABI } from '@/lib/abis/MockOracle';
 
 /**
  * Hook to get oracle data
@@ -10,27 +10,14 @@ export function useOracle() {
     contracts: [
       {
         address: CONTRACTS.ORACLE,
-        abi: PushOracleABI,
+        abi: MockOracleABI,
         functionName: 'getPrice',
         chainId: creditcoinTestnet.id,
       },
       {
         address: CONTRACTS.ORACLE,
-        abi: PushOracleABI,
+        abi: MockOracleABI,
         functionName: 'isFresh',
-        chainId: creditcoinTestnet.id,
-      },
-      {
-        address: CONTRACTS.ORACLE,
-        abi: PushOracleABI,
-        functionName: 'lastUpdateTime',
-        chainId: creditcoinTestnet.id,
-      },
-      {
-        // Fallback to raw stored price if getPrice() reverts due to staleness
-        address: CONTRACTS.ORACLE,
-        abi: PushOracleABI,
-        functionName: 'price',
         chainId: creditcoinTestnet.id,
       },
     ],
@@ -38,13 +25,9 @@ export function useOracle() {
   });
 
   return {
-    price:
-      // Prefer fresh price
-      (data?.[0]?.status === 'success' ? (data?.[0]?.result as bigint) : undefined) ??
-      // Fallback to stored price even if stale
-      (data?.[3]?.status === 'success' ? (data?.[3]?.result as bigint) : undefined),
+    price: data?.[0]?.status === 'success' ? (data?.[0]?.result as bigint) : undefined,
     isFresh: data?.[1]?.result as boolean | undefined,
-    lastUpdateTime: data?.[2]?.result as bigint | undefined,
+    lastUpdateTime: undefined,
     isLoading,
     refetch,
   };

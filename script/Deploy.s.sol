@@ -17,12 +17,12 @@ import "../src/LiquidationEngine.sol";
  */
 contract DeployScript is Script {
     // Deployment parameters
-    uint256 constant INITIAL_PRICE = 10e18; // $2000 per wCTC
+    uint256 constant INITIAL_PRICE = 2000e18; // $2000 per wCTC
     uint256 constant STALENESS_THRESHOLD = 1 hours;
-    // Policy: Max LTV 85% => MCR = 1/0.85 ≈ 117.647%
-    uint256 constant MCR = (100e18) / 85; // ~117.647% minimum collateral ratio for borrowing
-    // Policy: Liquidation at LTV 90% => LiqRatio = 1/0.9 ≈ 111.111%
-    uint256 constant LIQUIDATION_RATIO = (100e18) / 90;
+    // Policy: Max LTV 85% => MCR ≈ 117.647% (WAD)
+    uint256 constant MCR = 1_176_470_588_235_294_118; // 1.176470588235294118e18
+    // Policy: Liquidation at LTV 90% => LiqRatio ≈ 111.111% (WAD)
+    uint256 constant LIQUIDATION_RATIO = 1_111_111_111_111_111_111; // 1.111111111111111111e18
     uint256 constant BORROWING_FEE = 5e15; // 0.5%
     uint256 constant LIQUIDATION_PENALTY = 5e16; // 5%
 
@@ -66,18 +66,14 @@ contract DeployScript is Script {
 
         // Step 2: Deploy core protocol contracts
         console.log("Step 2: Deploying core protocol contracts...");
-        vaultManager = new VaultManager(
-            address(wctc),
-            address(stablecoin),
-            address(oracle),
-            address(treasury),
-            MCR,
-            BORROWING_FEE
-        );
+        vaultManager = new VaultManager();
         console.log("  VaultManager deployed at:", address(vaultManager));
+        vaultManager.initialize(address(wctc), address(stablecoin), address(oracle), address(treasury), MCR, BORROWING_FEE);
 
-        stabilityPool = new StabilityPool(address(stablecoin), address(wctc));
+        // Deploy StabilityPool (constructorless) and initialize
+        stabilityPool = new StabilityPool();
         console.log("  StabilityPool deployed at:", address(stabilityPool));
+        stabilityPool.initialize(address(stablecoin), address(wctc));
 
         liquidationEngine = new LiquidationEngine(
             address(vaultManager),

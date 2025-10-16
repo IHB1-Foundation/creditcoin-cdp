@@ -41,16 +41,11 @@ contract CreditCDPTest is Test {
         oracle = new PushOracle(STALENESS_THRESHOLD, INITIAL_PRICE);
         treasury = new Treasury();
 
-        vaultManager = new VaultManager(
-            address(wctc),
-            address(rusd),
-            address(oracle),
-            address(treasury),
-            MCR,
-            BORROWING_FEE
-        );
+        vaultManager = new VaultManager();
+        vaultManager.initialize(address(wctc), address(rusd), address(oracle), address(treasury), MCR, BORROWING_FEE);
 
-        stabilityPool = new StabilityPool(address(rusd), address(wctc));
+        stabilityPool = new StabilityPool();
+        stabilityPool.initialize(address(rusd), address(wctc));
 
         liquidationEngine = new LiquidationEngine(
             address(vaultManager),

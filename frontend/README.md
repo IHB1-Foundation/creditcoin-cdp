@@ -136,7 +136,7 @@ frontend/
 │       ├── StabilityPool.ts
 │       ├── ERC20.ts
 │       ├── WCTC.ts
-│       ├── PushOracle.ts
+│       ├── MockOracle.ts
 │       └── LiquidationEngine.ts
 ├── package.json
 ├── tsconfig.json
@@ -203,13 +203,13 @@ Click "Connect Wallet" in the header to connect MetaMask to CreditCoin Testnet.
 
 - **Fee**: 0.5% default redemption fee on collateral received
 - **Targeting**: Redeems from vaults with lowest APR first; prefers larger loans on ties
-- **Oracle Price**: Uses real-time oracle price for redemption rate
+- **Oracle Price**: Uses mock oracle price for redemption rate
 
 ## Troubleshooting
 
 ### "Oracle price is stale" Warning
 
-The oracle hasn't been updated recently. Transactions may fail until the price is refreshed.
+When using MockOracle, price is always considered fresh.
 
 ### "Insufficient collateral ratio" Error
 
@@ -232,7 +232,7 @@ Update these in your `.env.local` file after deployment:
 - **VaultManager**: Main vault operations
 - **StabilityPool**: Stability pool contract
 - **LiquidationEngine**: Liquidation logic
-- **Oracle**: Price feed (PushOracle)
+- **Oracle**: Price feed (MockOracle)
 - **Treasury**: Fee collection
   
 Advanced methods on `VaultManager`:
@@ -282,7 +282,7 @@ npm run lint
 - Never use mainnet private keys for testnets
 - Always verify contract addresses
 - Test with small amounts first
-- Monitor oracle price freshness
+- Monitor oracle price freshness (always true with MockOracle)
 
 ## License
 
