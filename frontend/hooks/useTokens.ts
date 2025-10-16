@@ -1,4 +1,4 @@
-import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance, usePublicClient, useChainId } from 'wagmi';
+import { useAccount, useReadContracts, useWriteContract, useWaitForTransactionReceipt, useBalance, useChainId, usePublicClient } from 'wagmi';
 import { CONTRACTS, creditcoinTestnet } from '@/lib/config';
 import { ERC20ABI } from '@/lib/abis/ERC20';
 import { WCTCABI } from '@/lib/abis/WCTC';
@@ -68,8 +68,8 @@ export function useAllowances(spender: `0x${string}`) {
  */
 export function useApprove() {
   const { writeContract, data: hash, isPending, error } = useWriteContract();
-  const publicClient = usePublicClient();
   const chainId = useChainId();
+  const publicClient = usePublicClient();
   const { address } = useAccount();
 
   const { isLoading: isConfirming, isSuccess } = useWaitForTransactionReceipt({
@@ -90,51 +90,18 @@ export function useApprove() {
       const tokenAddress = token === 'wctc' ? CONTRACTS.WCTC : CONTRACTS.RUSD;
       const abi = token === 'wctc' ? WCTCABI : ERC20ABI;
 
-      // Preflight simulate approve(amount)
-      const simulate = async (amt: bigint) => {
-        return publicClient.simulateContract({
-          address: tokenAddress,
-          abi: abi as any,
-          functionName: 'approve',
-          args: [spender, amt],
-          account: address as any,
-        });
-      };
-
-      let sequence: Array<bigint | 'zero-then-amount'> = [];
+      // Direct approval with safe patterns (no simulation to avoid RPC issues)
+      const max = (1n << 256n) - 1n;
       try {
-        await simulate(amount);
-        sequence = [amount];
-      } catch (simErr1: any) {
-        // Try zero-then-amount pattern
-        try {
-          await simulate(0n);
-          await simulate(amount);
-          sequence = ['zero-then-amount'];
-        } catch (simErr2: any) {
-          // Fallback to max allowance
-          const max = (1n << 256n) - 1n;
-          await simulate(max);
-          sequence = [max];
-        }
+        // Conservative, highly-compatible sequence: zero then max
+        // Some tokens require zeroing before setting any non-zero allowance.
+        const gasZero = await publicClient.estimateContractGas({ address: tokenAddress, abi: abi as any, functionName: 'approve', args: [spender, 0n], account: address as any });
+        await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, 0n], chainId: creditcoinTestnet.id, gas: gasZero * 2n });
+      } catch (_) {
+        // ignore zeroing failures; proceed to set max
       }
-
-      // Execute writes per sequence
-      if (sequence.length === 1 && typeof sequence[0] === 'bigint') {
-        await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, sequence[0] as bigint], chainId: creditcoinTestnet.id });
-      } else if (sequence.length === 1 && sequence[0] === 'zero-then-amount') {
-        // shouldn't happen, but safe-guard
-        await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, 0n], chainId: creditcoinTestnet.id });
-        await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, amount], chainId: creditcoinTestnet.id });
-      } else {
-        if (sequence[0] === 'zero-then-amount') {
-          await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, 0n], chainId: creditcoinTestnet.id });
-          await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, amount], chainId: creditcoinTestnet.id });
-        } else {
-          const amt = sequence[0] as bigint;
-          await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, amt], chainId: creditcoinTestnet.id });
-        }
-      }
+      const gasMax = await publicClient.estimateContractGas({ address: tokenAddress, abi: abi as any, functionName: 'approve', args: [spender, max], account: address as any });
+      await writeContract({ address: tokenAddress, abi, functionName: 'approve', args: [spender, max], chainId: creditcoinTestnet.id, gas: gasMax * 2n });
     } catch (err: any) {
       toast.error(formatError(err));
       throw err;

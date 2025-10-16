@@ -298,11 +298,10 @@ export function StabilityPoolCard() {
           }
         />
 
-        {/* Balance / Allowance hint (deposit mode) */}
+        {/* Balance hint (deposit mode) */}
         {mode === 'deposit' && (
-          <div className="-mt-2 text-xs text-gray-500 flex justify-between">
-            <span>Balance: {rusdBalance !== undefined ? `${formatBigInt(rusdBalance, 18, 4)} crdUSD` : '--'}</span>
-            <span>Allowance: {rusdAllowance !== undefined ? `${formatBigInt(rusdAllowance, 18, 4)} crdUSD` : '--'}</span>
+          <div className="-mt-2 text-xs text-gray-500">
+            Balance: {rusdBalance !== undefined ? `${formatBigInt(rusdBalance, 18, 4)} crdUSD` : '--'}
           </div>
         )}
 
