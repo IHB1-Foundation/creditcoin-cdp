@@ -145,7 +145,7 @@ export function RedemptionCard() {
               </p>
                 {price && (
                   <p className="text-xs text-gray-500">
-                    ≈ {formatUSD((estimatedCollateral * price) / BigInt(1e18))}
+                    ≈ {formatUSD((estimatedCollateral * price) / (10n ** 18n))}
                   </p>
                 )}
               </div>

@@ -53,7 +53,7 @@ export function VaultCard() {
   // Sync newInterest field with on-chain interest when it changes
   useEffect(() => {
     if (vaultInterest !== undefined) {
-      const percent = Number((vaultInterest * BigInt(10000)) / BigInt(1e18)) / 100;
+      const percent = Number((vaultInterest * 10000n) / (10n ** 18n)) / 100;
       setNewInterest(percent.toString());
     }
   }, [vaultInterest]);
@@ -71,7 +71,7 @@ export function VaultCard() {
   const withdrawable = (() => {
     try {
       if (!price || !mcr || !vault) return undefined;
-      const PREC = BigInt(1e18);
+      const PREC = 10n ** 18n;
       const requiredValue = (vault.debt * mcr) / PREC;
       const minCollateral = (requiredValue * PREC) / price;
       return vault.collateral > minCollateral ? (vault.collateral - minCollateral) : BigInt(0);
@@ -80,7 +80,7 @@ export function VaultCard() {
   const additionalBorrow = (() => {
     try {
       if (!price || !mcr || !vault) return undefined;
-      const PREC = BigInt(1e18);
+      const PREC = 10n ** 18n;
       const cv = (vault.collateral * price) / PREC;
       const maxDebtGross = (cv * PREC) / mcr;
       const remainingCapacity = maxDebtGross > vault.debt ? (maxDebtGross - vault.debt) : BigInt(0);
@@ -394,7 +394,7 @@ export function VaultCard() {
                       }
                     } else {
                       // Max withdraw keeping MCR
-                      const PREC = BigInt(1e18);
+                      const PREC = 10n ** 18n;
                       const requiredValue = (vault.debt * mcr) / PREC; // USD
                       const minCollateral = (requiredValue * PREC) / price; // tCTC
                       const maxWithdraw = vault.collateral > minCollateral ? (vault.collateral - minCollateral) : BigInt(0);
@@ -445,7 +445,7 @@ export function VaultCard() {
                   className="text-sm text-primary-600 hover:text-primary-700 font-medium"
                   onClick={() => {
                     if (!vault || !price || !mcr) return;
-                    const PREC = BigInt(1e18);
+                    const PREC = 10n ** 18n;
                     if (isBorrow) {
                       // Max additional borrow under MCR considering fee
                       const cv = (vault.collateral * price) / PREC; // USD

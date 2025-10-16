@@ -148,7 +148,7 @@ export function OracleInfo() {
           value={totalCollateral ? `${formatCompactBigInt(totalCollateral, 18)} tCTC` : '--'}
           subtitle={
             totalCollateral && price
-              ? formatUSD((totalCollateral * price) / BigInt(1e18))
+              ? formatUSD((totalCollateral * price) / (10n ** 18n))
               : undefined
           }
         />

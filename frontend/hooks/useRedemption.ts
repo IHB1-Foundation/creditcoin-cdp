@@ -40,7 +40,7 @@ export function useRedemptionEstimate(rUSDAmount: bigint | undefined) {
     // net = gross - fee, where fee = gross * redemptionFee / 1e18
     // net = gross * (1 - redemptionFee / 1e18)
     // gross = net / (1 - redemptionFee / 1e18)
-    const precision = BigInt(1e18);
+    const precision = 10n ** 18n;
     const multiplier = precision - redemptionFee;
     grossCollateral = (estimatedCollateral * precision) / multiplier;
     feeAmount = grossCollateral - estimatedCollateral;

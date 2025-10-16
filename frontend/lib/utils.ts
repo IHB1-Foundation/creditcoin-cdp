@@ -75,7 +75,7 @@ export function formatUSD(value: bigint, decimals: number = 18): string {
 /**
  * Format percentage
  */
-export function formatPercentage(value: bigint, precision: bigint = BigInt(1e18)): string {
+export function formatPercentage(value: bigint, precision: bigint = 10n ** 18n): string {
   const num = Number(value * BigInt(10000) / precision) / 100;
   return `${num.toFixed(2)}%`;
 }
@@ -87,7 +87,7 @@ export function calculateCollateralRatio(
   collateral: bigint,
   debt: bigint,
   price: bigint,
-  precision: bigint = BigInt(1e18)
+  precision: bigint = 10n ** 18n
 ): bigint {
   if (debt === BigInt(0)) return BigInt(0);
   const collateralValue = (collateral * price) / precision;
@@ -101,10 +101,13 @@ export function calculateLiquidationPrice(
   collateral: bigint,
   debt: bigint,
   mcr: bigint,
-  precision: bigint = BigInt(1e18)
+  precision: bigint = 10n ** 18n
 ): bigint {
-  if (collateral === BigInt(0)) return BigInt(0);
-  return (debt * mcr) / collateral;
+  const c = BigInt(collateral as any);
+  const d = BigInt(debt as any);
+  const m = BigInt(mcr as any);
+  if (c === 0n) return 0n;
+  return (d * m) / c;
 }
 
 /**
@@ -165,6 +168,15 @@ export function formatError(error: any): string {
   }
   if (error.message?.includes('InsufficientCollateralRatio')) {
     return 'Insufficient collateral ratio';
+  }
+  if (error.message?.includes('DebtTooLow')) {
+    return 'Debt too low: minimum borrow is 100 crdUSD';
+  }
+  if (error.message?.includes('InvalidParameters')) {
+    return 'Invalid parameters. Check amounts and interest rate.';
+  }
+  if (error.message?.includes('ChainMismatch') || error.message?.includes('wrong network')) {
+    return 'Wrong network. Switch to the configured testnet.';
   }
   if (error.message?.includes('Unauthorized')) {
     return 'Unauthorized action';

@@ -59,6 +59,22 @@ export function OpenVaultCard() {
       rateNum = Math.round(rateNum * 100) / 100;
       const rateWad = parseToBigInt((rateNum / 100).toString());
 
+      // Client-side MCR check to prevent on-chain reverts
+      if (!price || !mcr) {
+        toast.error('Oracle price or MCR unavailable. Try again shortly.');
+        return;
+      }
+      const PREC = 10n ** 18n;
+      const cv = (collateral * price) / PREC; // USD value (1e18)
+      const bf = borrowingFee ?? BigInt(0);
+      const totalDebtWithFee = debt + (debt * bf) / PREC;
+      const requiredCollateral = (totalDebtWithFee * mcr) / PREC;
+      if (cv < requiredCollateral) {
+        const required = (requiredCollateral * PREC) / price; // required collateral in tCTC (1e18)
+        toast.error(`Insufficient collateral for MCR. Requires at least ${formatBigInt(required, 18, 4)} tCTC.`);
+        return;
+      }
+
       await openVault(collateral, debt, rateWad);
     } catch (error) {
       // handled in hooks
@@ -82,7 +98,7 @@ export function OpenVaultCard() {
       if (!price || !mcr) return undefined;
       const collateral = parseToBigInt(collateralAmount);
       if (collateral === BigInt(0)) return undefined;
-      const PREC = BigInt(1e18);
+      const PREC = 10n ** 18n;
       const cv = (collateral * price) / PREC;
       const maxDebtGross = (cv * PREC) / mcr;
       const bf = borrowingFee ?? BigInt(0);
@@ -155,7 +171,7 @@ export function OpenVaultCard() {
                   if (!price || !mcr) return;
                   const collateral = parseToBigInt(collateralAmount);
                   if (collateral === BigInt(0)) return;
-                  const PREC = BigInt(1e18);
+                  const PREC = 10n ** 18n;
                   const cv = (collateral * price) / PREC; // collateral value in USD (1e18)
                   // Max total debt allowed by MCR
                   const maxDebtGross = (cv * PREC) / mcr; // USD (1e18)
