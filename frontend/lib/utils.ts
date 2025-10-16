@@ -11,7 +11,8 @@ export function cn(...inputs: ClassValue[]) {
 /**
  * Format a BigInt to a human-readable string
  */
-export function formatBigInt(value: bigint, decimals: number = 18, displayDecimals: number = 4): string {
+export function formatBigInt(value: bigint | undefined, decimals: number = 18, displayDecimals: number = 4): string {
+  if (typeof value !== 'bigint') return '--';
   const formatted = formatUnits(value, decimals);
   const num = parseFloat(formatted);
 
@@ -39,7 +40,8 @@ export function formatForInput(value: bigint, decimals: number = 18, maxDecimals
 /**
  * Format a BigInt compactly (e.g., 12.3K, 4.5M)
  */
-export function formatCompactBigInt(value: bigint, decimals: number = 18): string {
+export function formatCompactBigInt(value: bigint | undefined, decimals: number = 18): string {
+  if (typeof value !== 'bigint') return '--';
   const formatted = formatUnits(value, decimals);
   const num = parseFloat(formatted);
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(num);
@@ -60,7 +62,8 @@ export function parseToBigInt(value: string, decimals: number = 18): bigint {
 /**
  * Format USD amount
  */
-export function formatUSD(value: bigint, decimals: number = 18): string {
+export function formatUSD(value: bigint | undefined, decimals: number = 18): string {
+  if (typeof value !== 'bigint') return '--';
   const formatted = formatUnits(value, decimals);
   const num = parseFloat(formatted);
 
@@ -89,7 +92,10 @@ export function calculateCollateralRatio(
   price: bigint,
   precision: bigint = 10n ** 18n
 ): bigint {
-  if (debt === BigInt(0)) return BigInt(0);
+  if (typeof collateral !== 'bigint' || typeof debt !== 'bigint' || typeof price !== 'bigint' || typeof precision !== 'bigint') {
+    return 0n;
+  }
+  if (debt === 0n) return 0n;
   const collateralValue = (collateral * price) / precision;
   return (collateralValue * precision) / debt;
 }
@@ -103,11 +109,11 @@ export function calculateLiquidationPrice(
   mcr: bigint,
   precision: bigint = 10n ** 18n
 ): bigint {
-  const c = BigInt(collateral as any);
-  const d = BigInt(debt as any);
-  const m = BigInt(mcr as any);
-  if (c === 0n) return 0n;
-  return (d * m) / c;
+  if (typeof collateral !== 'bigint' || typeof debt !== 'bigint' || typeof mcr !== 'bigint' || typeof precision !== 'bigint') {
+    return 0n;
+  }
+  if (collateral === 0n) return 0n;
+  return (debt * mcr) / collateral;
 }
 
 /**

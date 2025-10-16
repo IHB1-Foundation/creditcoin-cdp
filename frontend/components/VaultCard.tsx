@@ -246,7 +246,11 @@ export function VaultCard() {
           <StatCard
             label="Collateral"
             value={`${formatCompactBigInt(vault.collateral)} tCTC`}
-            subtitle={price ? formatUSD((vault.collateral * price) / PROTOCOL_PARAMS.PRECISION) : undefined}
+            subtitle={
+              vault && typeof vault.collateral === 'bigint' && typeof price === 'bigint'
+                ? formatUSD((vault.collateral * price) / PROTOCOL_PARAMS.PRECISION)
+                : undefined
+            }
           />
           <StatCard
             label="Debt"
@@ -471,12 +475,15 @@ export function VaultCard() {
             {
               (() => {
                 if (!vault || !price || !mcr) return null;
-                const collatDeltaBI = parseToBigInt(collateralDelta);
-                const debtDeltaBI = parseToBigInt(debtDelta);
-                const newCollateral = isDeposit ? (vault.collateral + collatDeltaBI) : (vault.collateral - collatDeltaBI);
-                const newDebt = isBorrow ? (vault.debt + debtDeltaBI) : (vault.debt - debtDeltaBI);
-                if (newCollateral >= BigInt(0) && newDebt > BigInt(0)) {
-                  const ratio = calculateCollateralRatio(newCollateral, newDebt, price);
+                if (typeof vault.collateral !== 'bigint' || typeof vault.debt !== 'bigint' || typeof price !== 'bigint') return null;
+                const collatDeltaBI: bigint = parseToBigInt(collateralDelta);
+                const debtDeltaBI: bigint = parseToBigInt(debtDelta);
+                const baseCollateral: bigint = vault.collateral;
+                const baseDebt: bigint = vault.debt;
+                const newCollateral: bigint = isDeposit ? (baseCollateral + collatDeltaBI) : (baseCollateral - collatDeltaBI);
+                const newDebt: bigint = isBorrow ? (baseDebt + debtDeltaBI) : (baseDebt - debtDeltaBI);
+                if (newCollateral >= 0n && newDebt > 0n) {
+                  const ratio = calculateCollateralRatio(newCollateral, newDebt, price as bigint);
                   const health = getHealthStatus(ratio, liquidationRatio ?? mcr);
                   return (
                     <div className="mt-2 text-sm text-gray-600">

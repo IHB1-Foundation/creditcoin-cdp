@@ -36,10 +36,36 @@ export function OpenVaultCard() {
     }
   }, [openSuccess]);
 
+  // Precompute parsed values
+  const PREC = 10n ** 18n;
+  const collateralBI = parseToBigInt(collateralAmount);
+  const debtBI = parseToBigInt(debtAmount);
+
+  // Compute required collateral for current inputs, if possible
+  const requiredCollateral: bigint | undefined = (() => {
+    try {
+      if (!price || !mcr || debtBI === 0n) return undefined;
+      const bf = borrowingFee ?? 0n;
+      const totalDebtWithFee = debtBI + (debtBI * bf) / PREC;
+      const requiredCollateralValue = (totalDebtWithFee * mcr) / PREC; // in USD (1e18)
+      // convert to tCTC units at oracle price
+      return (requiredCollateralValue * PREC) / price;
+    } catch {
+      return undefined;
+    }
+  })();
+
+  // Validate inputs
+  const rateNumRaw = Number(interestRate);
+  const rateOk = !isNaN(rateNumRaw) && rateNumRaw >= 0 && rateNumRaw <= 40;
+  const minDebtOk = debtBI >= PROTOCOL_PARAMS.MIN_DEBT;
+  const mcrOk = requiredCollateral !== undefined ? (collateralBI >= requiredCollateral) : false;
+  const canOpen = price !== undefined && mcr !== undefined && rateOk && minDebtOk && mcrOk && collateralBI > 0n;
+
   const handleOpenVault = async () => {
     try {
-      const collateral = parseToBigInt(collateralAmount);
-      const debt = parseToBigInt(debtAmount);
+      const collateral = collateralBI;
+      const debt = debtBI;
 
       if (collateral === BigInt(0) || debt === BigInt(0)) {
         toast.error('Please enter valid amounts');
@@ -51,27 +77,26 @@ export function OpenVaultCard() {
         return;
       }
 
-      let rateNum = Number(interestRate);
-      if (isNaN(rateNum) || rateNum < 0 || rateNum > 40) {
+      let rateNum = rateNumRaw;
+      if (!rateOk) {
         toast.error('Interest rate must be between 0% and 40%');
         return;
       }
       rateNum = Math.round(rateNum * 100) / 100;
       const rateWad = parseToBigInt((rateNum / 100).toString());
 
-      // Client-side MCR check to prevent on-chain reverts
+      // Client-side checks to prevent on-chain reverts
       if (!price || !mcr) {
         toast.error('Oracle price or MCR unavailable. Try again shortly.');
         return;
       }
-      const PREC = 10n ** 18n;
-      const cv = (collateral * price) / PREC; // USD value (1e18)
-      const bf = borrowingFee ?? BigInt(0);
-      const totalDebtWithFee = debt + (debt * bf) / PREC;
-      const requiredCollateral = (totalDebtWithFee * mcr) / PREC;
-      if (cv < requiredCollateral) {
-        const required = (requiredCollateral * PREC) / price; // required collateral in tCTC (1e18)
-        toast.error(`Insufficient collateral for MCR. Requires at least ${formatBigInt(required, 18, 4)} tCTC.`);
+      if (!minDebtOk) {
+        toast.error(`Minimum debt is ${formatBigInt(PROTOCOL_PARAMS.MIN_DEBT)} crdUSD`);
+        return;
+      }
+      if (!mcrOk) {
+        const req = requiredCollateral!;
+        toast.error(`Insufficient collateral for MCR. Requires at least ${formatBigInt(req, 18, 4)} tCTC.`);
         return;
       }
 
@@ -193,6 +218,13 @@ export function OpenVaultCard() {
           }
         />
 
+        {/* Min collateral required hint */}
+        {requiredCollateral !== undefined && debtBI > 0n && (
+          <div className="-mt-2 text-xs text-gray-500">
+            Min collateral required: <span className="font-medium">{formatBigInt(requiredCollateral, 18, 4)} tCTC</span>
+          </div>
+        )}
+
         <div>
           <div className="flex items-center justify-between mb-1">
             <label className="text-sm font-medium text-gray-700">Interest Rate (%)</label>
@@ -230,7 +262,7 @@ export function OpenVaultCard() {
           </div>
         )}
 
-        <Button className="w-full" onClick={handleOpenVault} isLoading={isOpening}>
+        <Button className="w-full" onClick={handleOpenVault} isLoading={isOpening} disabled={!canOpen}>
           Open Vault
         </Button>
       </div>
