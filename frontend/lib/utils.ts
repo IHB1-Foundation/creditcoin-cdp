@@ -9,11 +9,29 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
+ * Best-effort coercion to bigint for UI values coming from RPC/hooks.
+ */
+export function toBigInt(value: unknown): bigint | undefined {
+  if (typeof value === 'bigint') return value;
+  if (typeof value === 'string' && value !== '') {
+    try { return BigInt(value); } catch { return undefined; }
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    try { return BigInt(Math.trunc(value)); } catch { return undefined; }
+  }
+  if (value && typeof (value as any).toString === 'function') {
+    try { return BigInt((value as any).toString()); } catch { return undefined; }
+  }
+  return undefined;
+}
+
+/**
  * Format a BigInt to a human-readable string
  */
-export function formatBigInt(value: bigint | undefined, decimals: number = 18, displayDecimals: number = 4): string {
-  if (typeof value !== 'bigint') return '--';
-  const formatted = formatUnits(value, decimals);
+export function formatBigInt(value: unknown, decimals: number = 18, displayDecimals: number = 4): string {
+  const bi = toBigInt(value);
+  if (bi === undefined) return '--';
+  const formatted = formatUnits(bi, decimals);
   const num = parseFloat(formatted);
 
   if (num === 0) return '0';
@@ -40,9 +58,10 @@ export function formatForInput(value: bigint, decimals: number = 18, maxDecimals
 /**
  * Format a BigInt compactly (e.g., 12.3K, 4.5M)
  */
-export function formatCompactBigInt(value: bigint | undefined, decimals: number = 18): string {
-  if (typeof value !== 'bigint') return '--';
-  const formatted = formatUnits(value, decimals);
+export function formatCompactBigInt(value: unknown, decimals: number = 18): string {
+  const bi = toBigInt(value);
+  if (bi === undefined) return '--';
+  const formatted = formatUnits(bi, decimals);
   const num = parseFloat(formatted);
   return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 2 }).format(num);
 }
@@ -62,9 +81,10 @@ export function parseToBigInt(value: string, decimals: number = 18): bigint {
 /**
  * Format USD amount
  */
-export function formatUSD(value: bigint | undefined, decimals: number = 18): string {
-  if (typeof value !== 'bigint') return '--';
-  const formatted = formatUnits(value, decimals);
+export function formatUSD(value: unknown, decimals: number = 18): string {
+  const bi = toBigInt(value);
+  if (bi === undefined) return '--';
+  const formatted = formatUnits(bi, decimals);
   const num = parseFloat(formatted);
 
   return new Intl.NumberFormat('en-US', {

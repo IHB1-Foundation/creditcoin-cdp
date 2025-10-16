@@ -13,7 +13,7 @@ import { Skeleton } from './ui/Skeleton';
 import { useTokenBalances, useAllowances, useApprove, useWrap } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
 import { CONTRACTS, PROTOCOL_PARAMS } from '@/lib/config';
-import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio, formatForInput } from '@/lib/utils';
+import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio, formatForInput, toBigInt } from '@/lib/utils';
 import { HealthBadge } from './ui/HealthBadge';
 import toast from 'react-hot-toast';
 
@@ -180,7 +180,13 @@ export function VaultCard() {
   }
 
   const healthStatus = vault && collateralRatio && liquidationRatio ? getHealthStatus(collateralRatio, liquidationRatio) : null;
-  const liquidationPrice = vault && liquidationRatio && price ? calculateLiquidationPrice(vault.collateral, vault.debt, liquidationRatio) : undefined;
+  const liquidationPrice = (() => {
+    if (!vault || typeof liquidationRatio !== 'bigint') return undefined;
+    const coll = toBigInt(vault.collateral);
+    const debt = toBigInt(vault.debt);
+    if (coll === undefined || debt === undefined) return undefined;
+    return calculateLiquidationPrice(coll, debt, liquidationRatio as bigint);
+  })();
 
   let vaultsSubtitle = vaultIds && vaultIds.length > 0 ? `${vaultIds.length} vault(s)` : 'No vaults yet';
   if (vaultInterest !== undefined && vaultId !== undefined && !vaultLoading) {
@@ -218,7 +224,7 @@ export function VaultCard() {
 
       {/* Vault Stats */}
       {(vaultLoading || vaultIdsLoading) && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4">
           <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
             <Skeleton className="h-3 w-24 mb-3 rounded" />
             <Skeleton className="h-6 w-20 mb-2 rounded" />
@@ -242,14 +248,17 @@ export function VaultCard() {
         </div>
       )}
       {vault && vaultId !== undefined && !vaultLoading && (
-        <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="mb-6 grid grid-cols-1 gap-4">
           <StatCard
             label="Collateral"
             value={`${formatCompactBigInt(vault.collateral)} tCTC`}
             subtitle={
-              vault && typeof vault.collateral === 'bigint' && typeof price === 'bigint'
-                ? formatUSD((vault.collateral * price) / PROTOCOL_PARAMS.PRECISION)
-                : undefined
+              (() => {
+                if (typeof price !== 'bigint') return undefined;
+                const coll = toBigInt(vault.collateral);
+                if (coll === undefined) return undefined;
+                return formatUSD((coll * price) / PROTOCOL_PARAMS.PRECISION);
+              })()
             }
           />
           <StatCard

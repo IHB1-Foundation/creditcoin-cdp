@@ -35,7 +35,7 @@ export function useUserVaults() {
  * Hook to get vault data
  */
 export function useVaultData(vaultId: bigint | undefined) {
-  const { data: vaultBasic, isLoading, refetch } = useReadContract({
+  const { data: vaultBasicRaw, isLoading, refetch } = useReadContract({
     address: CONTRACTS.VAULT_MANAGER,
     abi: VaultManagerABI,
     functionName: 'getVaultBasic',
@@ -45,6 +45,21 @@ export function useVaultData(vaultId: bigint | undefined) {
       enabled: vaultId !== undefined,
     },
   });
+  // Normalize vault struct result from wagmi (can be array or named object)
+  let vaultBasic: VaultBasic | undefined = undefined;
+  if (vaultBasicRaw !== undefined) {
+    const vb: any = vaultBasicRaw as any;
+    if (Array.isArray(vb) && vb.length >= 4) {
+      vaultBasic = {
+        owner: vb[0] as string,
+        collateral: vb[1] as bigint,
+        debt: vb[2] as bigint,
+        timestamp: vb[3] as bigint,
+      };
+    } else if (vb && typeof vb === 'object' && 'owner' in vb && 'collateral' in vb && 'debt' in vb && 'timestamp' in vb) {
+      vaultBasic = vb as VaultBasic;
+    }
+  }
 
   const { data: ratio } = useReadContract({
     address: CONTRACTS.VAULT_MANAGER,
@@ -80,7 +95,7 @@ export function useVaultData(vaultId: bigint | undefined) {
   });
 
   return {
-    vault: vaultBasic as VaultBasic | undefined,
+    vault: vaultBasic,
     collateralRatio: ratio as bigint | undefined,
     canLiquidate: canLiquidate as boolean | undefined,
     interestRate: interest as bigint | undefined,
