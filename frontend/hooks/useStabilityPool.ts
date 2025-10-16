@@ -31,7 +31,16 @@ export function useStabilityPoolData() {
     },
   });
 
-  const depositorInfo = data?.[0]?.result as [bigint, bigint] | undefined;
+  // Normalize depositor info (wagmi may return tuple array or named object)
+  let depositorInfo: [bigint, bigint] | undefined = undefined;
+  const raw = data?.[0]?.result as any;
+  if (raw !== undefined) {
+    if (Array.isArray(raw) && raw.length >= 2) {
+      depositorInfo = [raw[0] as bigint, raw[1] as bigint];
+    } else if (raw && typeof raw === 'object' && 'depositAmount' in raw && 'collateralGain' in raw) {
+      depositorInfo = [raw.depositAmount as bigint, raw.collateralGain as bigint];
+    }
+  }
 
   return {
     depositAmount: depositorInfo?.[0] || BigInt(0),

@@ -5,8 +5,9 @@ import { Card } from './ui/Card';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { StatCard } from './ui/StatCard';
-import { useAccount } from 'wagmi';
+import { useAccount, usePublicClient } from 'wagmi';
 import { useStabilityPoolData, useStabilityDeposit, useStabilityWithdraw, useClaimCollateralGain } from '@/hooks/useStabilityPool';
+import { StabilityPoolABI } from '@/lib/abis/StabilityPool';
 import { useTokenBalances, useAllowances, useApprove } from '@/hooks/useTokens';
 import { CONTRACTS } from '@/lib/config';
 import { formatBigInt, formatCompactBigInt, parseToBigInt, formatForInput } from '@/lib/utils';
@@ -14,13 +15,16 @@ import { Skeleton } from './ui/Skeleton';
 import toast from 'react-hot-toast';
 
 export function StabilityPoolCard() {
-  const { isConnected } = useAccount();
+  const { isConnected, address } = useAccount();
+  const publicClient = usePublicClient();
   const { depositAmount, collateralGain, totalDeposits, isLoading: poolLoading, refetch: refetchPool } = useStabilityPoolData();
   const { rusdBalance, refetch: refetchBalances } = useTokenBalances();
   const { rusdAllowance, refetch: refetchAllowances } = useAllowances(CONTRACTS.STABILITY_POOL);
 
   const [mode, setMode] = useState<'deposit' | 'withdraw'>('deposit');
   const [amount, setAmount] = useState('');
+  type Step = 'idle' | 'checking' | 'approving' | 'depositing' | 'done' | 'error';
+  const [depositStep, setDepositStep] = useState<Step>('idle');
 
   const { deposit, isPending: isDepositing, isSuccess: depositSuccess } = useStabilityDeposit();
   const { withdraw, isPending: isWithdrawing, isSuccess: withdrawSuccess } = useStabilityWithdraw();
@@ -40,7 +44,10 @@ export function StabilityPoolCard() {
   useEffect(() => {
     if (depositSuccess) {
       setAmount('');
+      setDepositStep('done');
       toast.success('Deposited to Stability Pool!');
+      // reset back to idle after a moment
+      setTimeout(() => setDepositStep('idle'), 1200);
     }
   }, [depositSuccess]);
 
@@ -71,16 +78,69 @@ export function StabilityPoolCard() {
         return;
       }
 
-      // Check approval
-      if (rusdAllowance === undefined || rusdAllowance < depositAmt) {
-        toast('Approving crdUSD...', { icon: '⏳' });
-        await approve('rusd', CONTRACTS.STABILITY_POOL, depositAmt * BigInt(2));
+      // Guard: addresses configured
+      if (!CONTRACTS.STABILITY_POOL || CONTRACTS.STABILITY_POOL === '0x0000000000000000000000000000000000000000') {
+        toast.error('StabilityPool address is not configured');
+        return;
+      }
+      if (!CONTRACTS.RUSD || CONTRACTS.RUSD === '0x0000000000000000000000000000000000000000') {
+        toast.error('crdUSD address is not configured');
         return;
       }
 
-      await deposit(depositAmt);
+      // Step 1: Check allowance (if we have it), approve only when actually needed
+      setDepositStep('checking');
+      const allowanceKnown = rusdAllowance !== undefined;
+      const needsApproveNow = allowanceKnown && rusdAllowance! < depositAmt;
+      if (needsApproveNow) {
+        setDepositStep('approving');
+        await approve('rusd', CONTRACTS.STABILITY_POOL, depositAmt * BigInt(2));
+        await refetchAllowances();
+      }
+
+      // Step 2: Simulate deposit to catch precise revert reasons
+      try {
+        await publicClient.simulateContract({
+          address: CONTRACTS.STABILITY_POOL,
+          abi: StabilityPoolABI as any,
+          functionName: 'deposit',
+          args: [depositAmt],
+          account: address as any,
+        });
+      } catch (simErr: any) {
+        const simMsg = (simErr?.shortMessage || simErr?.message || '').toString();
+        const needsApprovalBySim = /(insufficient allowance|ERC20: insufficient allowance|transfer amount exceeds allowance)/i.test(simMsg);
+        if (needsApprovalBySim) {
+          setDepositStep('approving');
+          await approve('rusd', CONTRACTS.STABILITY_POOL, depositAmt * BigInt(2));
+          await refetchAllowances();
+        } else {
+          setDepositStep('error');
+          toast.error(simMsg || 'Simulation failed. Please try again.');
+          return;
+        }
+      }
+
+      // Step 3: Try deposit; on clear allowance error, approve then retry
+      setDepositStep('depositing');
+      try {
+        await deposit(depositAmt);
+      } catch (err: any) {
+        const msg = (err?.message || '').toString();
+        const needsApproveByError = /(insufficient allowance|ERC20: insufficient allowance|transfer amount exceeds allowance|TransferFailed)/i.test(msg);
+        if (!needsApproveNow && needsApproveByError) {
+          setDepositStep('approving');
+          await approve('rusd', CONTRACTS.STABILITY_POOL, depositAmt * BigInt(2));
+          await refetchAllowances();
+          setDepositStep('depositing');
+          await deposit(depositAmt);
+        } else {
+          throw err;
+        }
+      }
     } catch (error) {
       // Error handling in hook
+      setDepositStep('error');
     }
   };
 
@@ -134,7 +194,7 @@ export function StabilityPoolCard() {
   return (
     <Card title="Stability Pool" subtitle="Earn collateral from liquidations">
       {/* Your Position */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="mb-6 grid grid-cols-1 gap-4">
         {poolLoading && (
           <>
             <div className="p-4 border border-gray-100 rounded-xl bg-gradient-to-br from-gray-50 to-white">
@@ -238,6 +298,31 @@ export function StabilityPoolCard() {
           }
         />
 
+        {/* Balance / Allowance hint (deposit mode) */}
+        {mode === 'deposit' && (
+          <div className="-mt-2 text-xs text-gray-500 flex justify-between">
+            <span>Balance: {rusdBalance !== undefined ? `${formatBigInt(rusdBalance, 18, 4)} crdUSD` : '--'}</span>
+            <span>Allowance: {rusdAllowance !== undefined ? `${formatBigInt(rusdAllowance, 18, 4)} crdUSD` : '--'}</span>
+          </div>
+        )}
+
+        {mode === 'deposit' && amount && (
+          <div className="text-xs text-gray-600 space-y-1">
+            <div>
+              <span className={`mr-2 ${depositStep !== 'idle' ? 'text-primary-700' : ''}`}>1)</span>
+              Check allowance {depositStep === 'checking' && '…'} {depositStep !== 'idle' && depositStep !== 'checking' && '✓'}
+            </div>
+            <div>
+              <span className={`mr-2 ${depositStep === 'approving' ? 'text-primary-700' : ''}`}>2)</span>
+              Approve crdUSD (if needed) {depositStep === 'approving' && '…'} {depositStep !== 'idle' && depositStep !== 'checking' && depositStep !== 'approving' && '✓'}
+            </div>
+            <div>
+              <span className={`mr-2 ${depositStep === 'depositing' ? 'text-primary-700' : ''}`}>3)</span>
+              Deposit to pool {depositStep === 'depositing' && '…'} {depositStep === 'done' && '✓'}
+            </div>
+          </div>
+        )}
+
         <div className="text-xs text-gray-500">
           Available: <span className="font-medium text-gray-700">{mode === 'deposit'
             ? (rusdBalance ? formatBigInt(rusdBalance, 18, 2) : '--')
@@ -245,13 +330,38 @@ export function StabilityPoolCard() {
         </div>
 
         {mode === 'deposit' ? (
-          <Button
-            className="w-full"
-            onClick={handleDeposit}
-            isLoading={isDepositing || isApproving}
-          >
-            {isApproving ? 'Approving...' : 'Deposit'}
-          </Button>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {(() => {
+              const amt = parseToBigInt(amount);
+              const needsApprove = rusdAllowance !== undefined && amt > 0n && rusdAllowance < amt;
+              return needsApprove ? (
+                <Button
+                  className="w-full"
+                  variant="secondary"
+                  onClick={async () => {
+                    try {
+                      setDepositStep('approving');
+                      await approve('rusd', CONTRACTS.STABILITY_POOL, amt);
+                      await refetchAllowances();
+                      setDepositStep('idle');
+                      toast.success('Approved crdUSD');
+                    } catch {}
+                  }}
+                  isLoading={isApproving || depositStep === 'approving'}
+                >
+                  {isApproving || depositStep === 'approving' ? 'Approving…' : 'Approve crdUSD'}
+                </Button>
+              ) : null;
+            })()}
+            <Button
+              className="w-full"
+              onClick={handleDeposit}
+              disabled={(rusdAllowance !== undefined && parseToBigInt(amount) > rusdAllowance) || isApproving}
+              isLoading={isDepositing || depositStep === 'checking' || depositStep === 'depositing'}
+            >
+              {depositStep === 'depositing' || isDepositing ? 'Depositing…' : 'Deposit'}
+            </Button>
+          </div>
         ) : (
           <Button
             className="w-full"
