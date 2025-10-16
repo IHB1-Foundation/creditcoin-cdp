@@ -7,13 +7,14 @@ import { Input } from './ui/Input';
 import { StatCard } from './ui/StatCard';
 import { Tooltip } from './ui/Tooltip';
 import { InfoIcon } from './ui/InfoIcon';
-import { useAccount } from 'wagmi';
+import { useAccount, useWriteContract } from 'wagmi';
 import { useUserVaults, useVaultData, useOpenVault, useAdjustVault, useCloseVault, useProtocolParams, useUpdateInterest } from '@/hooks/useVault';
 import { Skeleton } from './ui/Skeleton';
 import { useTokenBalances, useAllowances, useApprove, useWrap } from '@/hooks/useTokens';
 import { useOracle } from '@/hooks/useOracle';
-import { CONTRACTS, PROTOCOL_PARAMS } from '@/lib/config';
-import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio, formatForInput, toBigInt } from '@/lib/utils';
+import { CONTRACTS, PROTOCOL_PARAMS, creditcoinTestnet } from '@/lib/config';
+import { VaultManagerABI } from '@/lib/abis/VaultManager';
+import { formatBigInt, formatCompactBigInt, formatPercentage, formatUSD, parseToBigInt, getHealthStatus, calculateLiquidationPrice, calculateCollateralRatio, formatForInput, toBigInt, formatError } from '@/lib/utils';
 import { HealthBadge } from './ui/HealthBadge';
 import toast from 'react-hot-toast';
 
@@ -62,6 +63,7 @@ export function VaultCard() {
 
   const { openVault, isPending: isOpening, isSuccess: openSuccess } = useOpenVault();
   const { adjustVault, isPending: isAdjusting, isSuccess: adjustSuccess } = useAdjustVault();
+  const { writeContract } = useWriteContract();
   const { closeVault, isPending: isClosing, isSuccess: closeSuccess } = useCloseVault();
   const { approve, isPending: isApproving, isSuccess: approveSuccess } = useApprove();
   // Native zapper: no wrapping needed in UI
@@ -128,33 +130,83 @@ export function VaultCard() {
   // Open flow moved to OpenVaultCard
 
   const handleAdjustVault = async () => {
-    if (!vaultId) return;
+    if (!vaultId || !vault) return;
 
     try {
-      const collatDelta = parseToBigInt(collateralDelta);
+      const collatDeltaBI = parseToBigInt(collateralDelta);
       const debtDeltaBI = parseToBigInt(debtDelta);
 
-      if (collatDelta === BigInt(0) && debtDeltaBI === BigInt(0)) {
+      if (collatDeltaBI === 0n && debtDeltaBI === 0n) {
         toast.error('Please enter an amount to adjust');
         return;
       }
 
-      // For native deposits, no ERC20 approval is needed
+      const baseCollateral = toBigInt(vault.collateral) ?? 0n;
+      const baseDebt = toBigInt(vault.debt) ?? 0n;
+      const finalCollatDelta = isDeposit ? collatDeltaBI : -collatDeltaBI;
+      const finalDebtDelta = isBorrow ? debtDeltaBI : -debtDeltaBI;
 
-      if (!isBorrow && debtDeltaBI > BigInt(0)) {
-        if (rusdAllowance === undefined || rusdAllowance < debtDeltaBI) {
-          toast('Approving crdUSD...', { icon: '⏳' });
-          await approve('rusd', CONTRACTS.VAULT_MANAGER, debtDeltaBI * BigInt(2));
+      const newCollateral = finalCollatDelta >= 0n ? (baseCollateral + finalCollatDelta) : (baseCollateral - (-finalCollatDelta));
+      const newDebtNoFee = finalDebtDelta >= 0n ? (baseDebt + finalDebtDelta) : (baseDebt - (-finalDebtDelta));
+
+      if (finalCollatDelta < 0n && newCollateral < 0n) {
+        toast.error('Cannot withdraw more collateral than available');
+        return;
+      }
+
+      // Repay requires having crdUSD (no ERC20 approval needed for burn)
+      if (finalDebtDelta < 0n) {
+        if (rusdBalance === undefined || rusdBalance < (-finalDebtDelta)) {
+          toast.error('Insufficient crdUSD balance to repay');
           return;
         }
       }
 
-      const finalCollatDelta = isDeposit ? collatDelta : -collatDelta;
-      const finalDebtDelta = isBorrow ? debtDeltaBI : -debtDeltaBI;
+      if ((finalCollatDelta < 0n || finalDebtDelta > 0n)) {
+        if (!price || !mcr) {
+          toast.error('Oracle price or MCR unavailable. Try again shortly.');
+          return;
+        }
+        const PREC = 10n ** 18n;
+        const cv = (newCollateral * price) / PREC;
+        const bf = borrowingFee ?? 0n;
+        const borrowFee = finalDebtDelta > 0n ? ((finalDebtDelta * bf) / PREC) : 0n;
+        const newDebtWithFee = newDebtNoFee + borrowFee;
+        if (newDebtWithFee > 0n) {
+          const required = (newDebtWithFee * mcr) / PREC;
+          if (cv < required) {
+            const requiredCollat = (required * PREC) / price;
+            toast.error(`Insufficient collateral after change. Requires at least ${formatBigInt(requiredCollat, 18, 4)} tCTC.`);
+            return;
+          }
+        }
+      }
 
-      await adjustVault(vaultId, finalCollatDelta, finalDebtDelta);
-    } catch (error) {
-      // Error handling in hook
+      // Execute: collateral change then debt change
+      if (finalCollatDelta > 0n) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'depositCollateralNative',
+          args: [vaultId],
+          value: finalCollatDelta,
+          chainId: creditcoinTestnet.id,
+        });
+      } else if (finalCollatDelta < 0n) {
+        await writeContract({
+          address: CONTRACTS.VAULT_MANAGER,
+          abi: VaultManagerABI,
+          functionName: 'withdrawCollateralNative',
+          args: [vaultId, (-finalCollatDelta)],
+          chainId: creditcoinTestnet.id,
+        });
+      }
+
+      if (finalDebtDelta !== 0n) {
+        await adjustVault(vaultId, 0n, finalDebtDelta);
+      }
+    } catch (error: any) {
+      toast.error(formatError(error));
     }
   };
 
